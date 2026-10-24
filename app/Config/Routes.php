@@ -19,6 +19,13 @@ $routes->group('services', function ($routes) {
     $routes->post('mettre-a-jour/(:num)', 'Services::mettreAJour/$1');
     $routes->post('supprimer/(:num)', 'Services::supprimer/$1');
 });
+$routes->group('exports', function ($routes) {
+    $routes->get('fournisseurs', 'Exports::fournisseurs');
+    $routes->get('contrats', 'Exports::contrats');
+    $routes->get('penalites', 'Exports::penalites');
+    $routes->get('obligations', 'Exports::obligations');
+    $routes->get('echeances', 'Exports::echeances');
+});
 $routes->group('fournisseurs', function ($routes) {
          $routes->get('/', 'Fournisseurs::index');
          $routes->get('nouveau', 'Fournisseurs::nouveau');
@@ -38,8 +45,44 @@ $routes->group('fournisseurs', function ($routes) {
          $routes->post('evaluations/enregistrer/(:num)', 'FournisseurEvaluations::enregistrer/$1');
          $routes->post('evaluations/supprimer/(:num)', 'FournisseurEvaluations::supprimer/$1');
      });
+$routes->group('types-contrat', function ($routes) {
+    $routes->get('/', 'TypesContrat::index');
+    $routes->get('nouveau', 'TypesContrat::nouveau');
+    $routes->post('enregistrer', 'TypesContrat::enregistrer');
+    $routes->get('modifier/(:num)', 'TypesContrat::modifier/$1');
+    $routes->post('mettre-a-jour/(:num)', 'TypesContrat::mettreAJour/$1');
+    $routes->get('activer/(:num)', 'TypesContrat::activer/$1');
+    $routes->get('desactiver/(:num)', 'TypesContrat::desactiver/$1');
+});
 $routes->group('alertes-regles', function ($routes) {
     $routes->get('/', 'AlertesRegles::index');
     $routes->get('modifier/(:num)', 'AlertesRegles::modifier/$1');
     $routes->post('mettre-a-jour/(:num)', 'AlertesRegles::mettreAJour/$1');
+});
+$routes->group('obligations', function ($routes) {
+    $routes->get('/', 'Obligations::index');
+    $routes->get('nouveau', 'Obligations::nouveau');
+    $routes->post('enregistrer', 'Obligations::enregistrer');
+    $routes->get('modifier/(:num)', 'Obligations::modifier/$1');
+    $routes->post('mettre-a-jour/(:num)', 'Obligations::mettreAJour/$1');
+    $routes->post('changer-statut/(:num)', 'Obligations::changerStatut/$1');
+    $routes->post('supprimer/(:num)', 'Obligations::supprimer/$1');
+});
+$routes->group('penalites', function ($routes) {
+    $routes->get('/', 'Penalites::index');
+    $routes->get('nouveau', 'Penalites::nouveau');
+    $routes->post('enregistrer', 'Penalites::enregistrer');
+    $routes->get('modifier/(:num)', 'Penalites::modifier/$1');
+    $routes->post('mettre-a-jour/(:num)', 'Penalites::mettreAJour/$1');
+    $routes->post('supprimer/(:num)', 'Penalites::supprimer/$1');
+});
+$routes->group('utilisateurs', function ($routes) {
+    $routes->get('/', 'Utilisateurs::index');
+    $routes->get('nouveau', 'Utilisateurs::nouveau');
+    $routes->post('enregistrer', 'Utilisateurs::enregistrer');
+    $routes->get('modifier/(:num)', 'Utilisateurs::modifier/$1');
+    $routes->post('mettre-a-jour/(:num)', 'Utilisateurs::mettreAJour/$1');
+    $routes->get('reinitialiser-mot-de-passe/(:num)', 'Utilisateurs::reinitialiserMotDePasse/$1');
+    $routes->get('desactiver/(:num)', 'Utilisateurs::desactiver/$1');
+    $routes->get('activer/(:num)', 'Utilisateurs::activer/$1');
 });

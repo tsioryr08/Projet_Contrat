@@ -5,18 +5,21 @@
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <form method="get" action="<?= site_url('fournisseurs') ?>" class="d-flex flex-wrap gap-2">
-        <input type="search" name="q" class="form-control" style="width: 18rem;"
-               placeholder="Raison sociale ou NIF" value="<?= esc($q, 'attr') ?>">
-        <select name="statut" class="form-select" style="width: 11rem;">
+        <input type="search" name="q" class="form-control" placeholder="Rechercher par raison sociale ou NIF"
+               value="<?= esc($q, 'attr') ?>">
+        <select name="statut" class="form-select" style="max-width: 200px;">
             <option value="">Tous les statuts</option>
             <?php foreach ($statuts as $code => $libelle): ?>
                 <option value="<?= esc($code, 'attr') ?>" <?= $statut === $code ? 'selected' : '' ?>><?= esc($libelle) ?></option>
             <?php endforeach; ?>
         </select>
-        <button class="btn btn-outline-secondary" type="submit">Filtrer</button>
-        <a class="btn btn-link" href="<?= site_url('fournisseurs') ?>">Réinitialiser</a>
+        <button class="btn btn-outline-secondary" type="submit">Rechercher</button>
+        <a class="btn btn-outline-secondary" href="<?= site_url('fournisseurs') ?>">Réinitialiser</a>
     </form>
-    <a class="btn btn-primary" href="<?= site_url('fournisseurs/nouveau') ?>">Nouveau fournisseur</a>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-success" href="<?= site_url('exports/fournisseurs?' . http_build_query(['q' => $q, 'statut' => $statut])) ?>">Exporter CSV</a>
+        <a class="btn btn-primary" href="<?= site_url('fournisseurs/nouveau') ?>">Nouveau fournisseur</a>
+    </div>
 </div>
 
 <p class="text-muted small"><?= (int) $pager->getTotal() ?> fournisseur(s)</p>
