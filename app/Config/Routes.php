@@ -38,12 +38,8 @@ $routes->group('fournisseurs', function ($routes) {
          $routes->post('evaluations/enregistrer/(:num)', 'FournisseurEvaluations::enregistrer/$1');
          $routes->post('evaluations/supprimer/(:num)', 'FournisseurEvaluations::supprimer/$1');
      });
-$routes->group('types-contrat', function ($routes) {
-    $routes->get('/', 'TypesContrat::index');
-    $routes->get('nouveau', 'TypesContrat::nouveau');
-    $routes->post('enregistrer', 'TypesContrat::enregistrer');
-    $routes->get('modifier/(:num)', 'TypesContrat::modifier/$1');
-    $routes->post('mettre-a-jour/(:num)', 'TypesContrat::mettreAJour/$1');
-    $routes->get('activer/(:num)', 'TypesContrat::activer/$1');
-    $routes->get('desactiver/(:num)', 'TypesContrat::desactiver/$1');
+$routes->group('alertes-regles', function ($routes) {
+    $routes->get('/', 'AlertesRegles::index');
+    $routes->get('modifier/(:num)', 'AlertesRegles::modifier/$1');
+    $routes->post('mettre-a-jour/(:num)', 'AlertesRegles::mettreAJour/$1');
 });
