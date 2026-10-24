@@ -1,0 +1,6 @@
+Pour T5 (Contacts d'un fournisseur), selon le contexte, il faut :
+
+Depuis la fiche fournisseur : ajout, modification et suppression d'un contact (nom, fonction, e-mail, téléphone)
+Un contact appartient toujours à un fournisseur
+Validation de l'e-mail
+3 contacts s'affichent, se modifient, se suppriment

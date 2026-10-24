@@ -156,19 +156,33 @@ class DemoSeeder extends Seeder
         $representants = ['Rakoto Jean', 'Rasoa Hanitra', 'Andry Rabe', 'Nirina Rajaona', 'Voahangy Rasolofo'];
         $fonctions     = ['Directeur commercial', 'Responsable comptabilité', 'Chargé de clientèle', 'Responsable juridique'];
 
-        $ids = [];
+        $ids  = [];
+        $nifs = [];
+        $stats = [];
         foreach ($liste as $i => [$nom, $secteur, $ville]) {
+            // NIF : 10 chiffres. STAT : 17 chiffres, les 8e à 11e chiffres sont l'année de création.
+            do {
+                $nif = sprintf('%010d', mt_rand(1000000000, 9999999999));
+            } while (isset($nifs[$nif]));
+            $nifs[$nif] = true;
+            do {
+                $stat = sprintf('%07d', mt_rand(1000000, 9999999))
+                      . sprintf('%04d', mt_rand(1960, (int) $this->aujourdhui->format('Y')))
+                      . sprintf('%06d', mt_rand(0, 999999));
+            } while (isset($stats[$stat]));
+            $stats[$stat] = true;
+
             $slug = strtolower(preg_replace('/[^a-z0-9]+/i', '', iconv('UTF-8', 'ASCII//TRANSLIT', $nom)));
             $this->db->table('fournisseurs')->insert([
                 'raison_sociale'     => $nom,
-                'nif'                => sprintf('%010d', mt_rand(1000000000, 9999999999)),
-                'stat'               => sprintf('%05d%02d%d%06d', mt_rand(10000, 99999), mt_rand(10, 99), mt_rand(1, 9), mt_rand(0, 999999)),
-                'rcs'                => 'RCS ' . $ville . ' ' . mt_rand(2008, 2022) . ' B ' . sprintf('%05d', mt_rand(1, 9999)),
+                'nif'                => $nif,
+                'stat'               => $stat,
+                'rcs'                => sprintf('RCS-%03d-%04d-%05d', mt_rand(1, 999), mt_rand(2000, (int) date('Y')), mt_rand(10000, 99999)),
                 'secteur'            => $secteur,
                 'adresse'            => mt_rand(1, 120) . ' rue ' . $this->choix(['Rainitovo', 'Ravoninahitriniarivo', 'de l\'Indépendance', 'Andriantsitohaina']),
                 'ville'              => $ville,
                 'email'              => 'contact@' . $slug . '.exemple.mg',
-                'telephone'          => '+261 34 ' . sprintf('%02d %03d %02d', mt_rand(10, 99), mt_rand(100, 999), mt_rand(10, 99)),
+                'telephone'          => '03' . mt_rand(2, 4) . sprintf('%07d', mt_rand(0, 9999999)),
                 'representant_legal' => $this->choix($representants),
                 'statut'             => $i === 18 ? 'suspendu' : 'actif',
             ]);
@@ -180,9 +194,9 @@ class DemoSeeder extends Seeder
                     'fournisseur_id' => $id,
                     'nom'            => $this->choix($representants),
                     'fonction'       => $this->choix($fonctions),
-                    'email'          => 'contact' . ($c + 1) . '@' . $slug . '.exemple.mg',
-                    'telephone'      => '+261 32 ' . sprintf('%02d %03d %02d', mt_rand(10, 99), mt_rand(100, 999), mt_rand(10, 99)),
-                ]);
+                'email'          => 'contact' . ($c + 1) . '@' . $slug . '.exemple.mg',
+                'telephone'      => '03' . mt_rand(2, 4) . sprintf('%07d', mt_rand(0, 9999999)),
+            ]);
             }
             if ($i < 12) {
                 $this->db->table('fournisseur_evaluations')->insert([
