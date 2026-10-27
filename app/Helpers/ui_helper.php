@@ -21,6 +21,7 @@ if (! function_exists('menu_pour_role')) {
             ],
             'Contrats' => [
                 ['Contrats', 'contrats', $tous],
+                ['Extraction IA', 'ia', ['admin', 'juriste', 'responsable']],
                 ['Obligations', 'obligations', ['admin', 'juriste', 'responsable']],
                 ['Litiges', 'litiges', ['admin', 'juriste', 'direction']],
                 ['Pénalités', 'penalites', ['admin', 'juriste', 'direction']],
