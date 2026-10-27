@@ -25,16 +25,26 @@ $routes->group('dashboard', ['filter' => 'auth'], function ($routes) {
 });
 
 // ============================================================
+// BLOC OLIVIER : alertes (O3)
+// ============================================================
+$routes->group('alertes', ['filter' => 'auth'], function ($routes) {
+    $routes->get('/', 'Alertes::index');
+    $routes->post('lue/(:num)', 'Alertes::lue/$1');
+    $routes->post('traitee/(:num)', 'Alertes::traitee/$1');
+    $routes->post('toutes-lues', 'Alertes::toutesLues');
+    $routes->post('traiter-contrat/(:num)', 'Alertes::traiterContrat/$1');
+});
+
+// ============================================================
 // BLOC OLIVIER : contrats (O2)
 // ============================================================
 
-// Lecture : tous les rôles
+// Lecture et export PDF : tous les rôles
 $routes->group('contrats', ['filter' => 'role:admin,juriste,responsable,direction,lecteur'], function ($routes) {
     $routes->get('/', 'Contrats::index');
     $routes->get('voir/(:num)', 'Contrats::voir/$1');
+    $routes->get('pdf/(:num)', 'Contrats::pdf/$1');
 });
-//alertes = redirection vers dashboard
-$routes->get('alertes', static fn () => redirect()->to('dashboard'), ['filter' => 'auth']);
 
 // Écriture : admin, juriste, responsable
 $routes->group('contrats', ['filter' => 'role:admin,juriste,responsable'], function ($routes) {

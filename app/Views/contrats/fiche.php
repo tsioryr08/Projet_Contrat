@@ -37,6 +37,7 @@ $date    = fn($d) => $d ? date_fr($d) : '—';
     </div>
     <div class="d-flex gap-2">
         <a href="<?= base_url('contrats') ?>" class="btn btn-outline-secondary">Retour à la liste</a>
+        <a href="<?= base_url('contrats/pdf/' . $contrat['id']) ?>" target="_blank" class="btn btn-outline-dark">Exporter en PDF</a>
         <?php if ($peutEcrire && $contrat['statut'] !== 'cloture'): ?>
             <a href="<?= base_url('contrats/modifier/' . $contrat['id']) ?>" class="btn btn-outline-primary">Modifier</a>
         <?php endif; ?>

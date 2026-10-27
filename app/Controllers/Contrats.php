@@ -7,6 +7,8 @@ use App\Models\ContratModel;
 use App\Models\UtilisateurModel;
 use App\Services\ContratService;
 use CodeIgniter\Exceptions\PageNotFoundException;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use RuntimeException;
 
 class Contrats extends BaseController
@@ -250,6 +252,53 @@ class Contrats extends BaseController
         audit_log('suppression', 'clauses', $id, $clause, null);
 
         return redirect()->to('contrats/voir/' . $clause['contrat_id'])->with('succes', 'Clause supprimée.');
+    }
+
+    // ------------------------------------------------------------ Export PDF
+    public function pdf(int $id)
+    {
+        $db = db_connect();
+
+        $contrat = $db->table('contrats c')
+            ->select("c.*, f.raison_sociale, f.nif, f.stat, f.rcs, f.adresse, f.ville, f.pays,
+                      f.representant_legal, t.libelle AS type_libelle, t.famille, s.nom AS service_nom,
+                      CONCAT_WS(' ', u.prenom, u.nom) AS responsable_nom", false)
+            ->join('fournisseurs f', 'f.id = c.fournisseur_id')
+            ->join('types_contrat t', 't.id = c.type_id')
+            ->join('services s', 's.id = c.service_id', 'left')
+            ->join('utilisateurs u', 'u.id = c.responsable_id', 'left')
+            ->where('c.id', $id)->get()->getRowArray();
+
+        if (! $contrat) {
+            throw PageNotFoundException::forPageNotFound('Contrat introuvable.');
+        }
+
+        // Seules les clauses validées figurent dans le document
+        $clauses = $db->table('clauses')->where('contrat_id', $id)->where('validee', 1)
+            ->orderBy('id')->get()->getResultArray();
+
+        $html = view('contrats/pdf', ['contrat' => $contrat, 'clauses' => $clauses]);
+
+        $options = new Options();
+        $options->set('defaultFont', 'DejaVu Sans');
+        $options->set('isRemoteEnabled', false);
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4');
+        $dompdf->render();
+
+        // Pied de page avec numérotation
+        $canvas = $dompdf->getCanvas();
+        $police = $dompdf->getFontMetrics()->getFont('DejaVu Sans');
+        $canvas->page_text(55, 810, 'Contrat ' . $contrat['reference'] . ' - édité le ' . date('d/m/Y'), $police, 8, [0.4, 0.4, 0.4]);
+        $canvas->page_text(490, 810, 'Page {PAGE_NUM} / {PAGE_COUNT}', $police, 8, [0.4, 0.4, 0.4]);
+
+        audit_log('export_pdf', 'contrats', $id, null, ['reference' => $contrat['reference']]);
+
+        return $this->response
+            ->setHeader('Content-Type', 'application/pdf')
+            ->setHeader('Content-Disposition', 'inline; filename="contrat-' . $contrat['reference'] . '.pdf"')
+            ->setBody($dompdf->output());
     }
 
     // ------------------------------------------------------------ Outils internes
