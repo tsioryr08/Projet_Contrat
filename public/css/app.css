@@ -1,0 +1,13 @@
+/* Feuille de style commune (T1) – complète Bootstrap 5 */
+body { background-color: #f5f6f8; }
+
+.badge-niveau { font-size: .8rem; padding: .4em .7em; font-weight: 600; }
+.badge-ok         { background-color: #198754; color: #fff; }   /* vert */
+.badge-a_examiner { background-color: #fd7e14; color: #fff; }   /* orange */
+.badge-urgent     { background-color: #dc3545; color: #fff; }   /* rouge */
+.badge-depasse    { background-color: #6c757d; color: #fff; }   /* gris */
+
+/* Retard de détection supérieur à 30 jours (T10) */
+.texte-retard { color: #dc3545; font-weight: 700; }
+
+.table thead th { white-space: nowrap; }
