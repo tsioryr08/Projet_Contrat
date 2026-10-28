@@ -105,8 +105,63 @@ fetch('<?= base_url('dashboard/echeances-json') . ($qs ? '?' . $qs : '') ?>')
     .then(r => r.json())
     .then(d => new Chart(document.getElementById('graphique'), {
         type: 'bar',
-        data: { labels: d.labels, datasets: [{ label: 'Contrats', data: d.valeurs, backgroundColor: '#0d6efd' }] },
-        options: { scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: false } } }
+        data: {
+            labels: d.labels,
+            datasets: [{
+                label: 'Contrats',
+                data: d.valeurs,
+                backgroundColor: function(context) {
+                    const chart = context.chart;
+                    const {ctx, chartArea} = chart;
+                    if (!chartArea) return '#B9D4EC';
+                    const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                    gradient.addColorStop(0, '#C9E4D0');
+                    gradient.addColorStop(1, '#B9D4EC');
+                    return gradient;
+                },
+                borderRadius: 10,
+                borderSkipped: false,
+                maxBarThickness: 42,
+                hoverBackgroundColor: function(context) {
+                    const chart = context.chart;
+                    const {ctx, chartArea} = chart;
+                    if (!chartArea) return '#A8C5E2';
+                    const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                    gradient.addColorStop(0, '#B8D8C4');
+                    gradient.addColorStop(1, '#A8C5E2');
+                    return gradient;
+                }
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    grid: { color: 'rgba(168, 197, 226, 0.18)' },
+                    ticks: { color: '#2E3A46', font: { family: 'Montserrat', size: 11 } }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: { precision: 0, color: '#2E3A46', font: { family: 'Montserrat', size: 11 } },
+                    grid: { color: 'rgba(168, 197, 226, 0.16)' }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(27, 42, 65, 0.9)',
+                    titleColor: '#FFFFFF',
+                    bodyColor: '#FFFFFF',
+                    borderColor: 'rgba(185, 212, 236, 0.6)',
+                    borderWidth: 1,
+                    cornerRadius: 10
+                }
+            },
+            animation: {
+                duration: 700,
+                easing: 'easeOutQuart'
+            }
+        }
     }));
 </script>
 <?= $this->endSection() ?>

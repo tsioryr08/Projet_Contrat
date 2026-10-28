@@ -13,9 +13,14 @@ class AlerteService
     private array $users    = [];
     private array $services = [];
 
-    public function __construct()
+    private ?AlerteRedacteurService $redacteur = null;
+    private bool $sansIa = false;
+
+    public function __construct(bool $sansIa = false)
     {
         $this->db = db_connect();
+        $this->sansIa = $sansIa;
+        $this->redacteur = new AlerteRedacteurService($sansIa);
     }
 
     public function generer(?string $date = null): array
@@ -45,12 +50,13 @@ class AlerteService
         $max    = (int) max(array_column($regles, 'jours_avant'));
         $limite = date('Y-m-d', strtotime("$auj +$max days"));
 
-        $contrats = $this->db->table('contrats')
-            ->select('id, reference, intitule, responsable_id, service_id, date_limite_non_reconduction')
-            ->whereIn('statut', self::CONTRAT_EN_COURS)
-            ->where('reconduction_tacite', 1)
-            ->where('date_limite_non_reconduction IS NOT NULL', null, false)
-            ->where('date_limite_non_reconduction <=', $limite)
+        $contrats = $this->db->table('contrats c')
+            ->select('c.id, c.reference, c.intitule, c.responsable_id, c.service_id, c.date_limite_non_reconduction, c.reconduction_tacite, c.confidentiel, f.raison_sociale AS fournisseur_nom')
+            ->join('fournisseurs f', 'f.id = c.fournisseur_id', 'left')
+            ->whereIn('c.statut', self::CONTRAT_EN_COURS)
+            ->where('c.reconduction_tacite', 1)
+            ->where('c.date_limite_non_reconduction IS NOT NULL', null, false)
+            ->where('c.date_limite_non_reconduction <=', $limite)
             ->get()->getResultArray();
 
         foreach ($contrats as $c) {
@@ -65,13 +71,14 @@ class AlerteService
                 continue;
             }
 
-            $sujet = "[{$r['code']}] Contrat {$c['reference']} : date limite de non-reconduction " . $this->delai($j);
-            $msg   = "Contrat : {$c['reference']} - {$c['intitule']}\n"
-                   . 'Date limite de non-reconduction : ' . $this->dateFr($c['date_limite_non_reconduction']) . ' (' . $this->delai($j) . ")\n"
-                   . 'Gravité : ' . ucfirst($r['gravite']) . "\n\n"
-                   . 'Sans action de votre part avant cette date, la reconduction tacite s\'applique.';
+            $c['jours_restants'] = $j;
+            $confidentiel = ((int) ($c['confidentiel'] ?? 0)) === 1;
+            $redige = $this->redacteur->rediger($c, (string) $r['code'], $confidentiel);
+            $sujet = $redige['sujet'];
+            $msg   = $redige['message'];
+            $genereParIa = (int) $redige['genere_par_ia'];
 
-            $this->creerAlertes($r, (int) $c['id'], 0, $c['date_limite_non_reconduction'], $dest, $sujet, $msg, $stats);
+            $this->creerAlertes($r, (int) $c['id'], 0, $c['date_limite_non_reconduction'], $dest, $sujet, $msg, $stats, $genereParIa);
         }
     }
 
@@ -112,7 +119,7 @@ class AlerteService
 
     /** Insertion ignorée si l'alerte existe (clé unique uq_alerte). */
     private function creerAlertes(array $regle, int $contratId, int $obligationId, string $dateRef,
-                                  array $dest, string $sujet, string $msg, array &$stats): void
+                                  array $dest, string $sujet, string $msg, array &$stats, int $genereParIa = 0): void
     {
         $datePrevue = date('Y-m-d', strtotime($dateRef . ' -' . (int) $regle['jours_avant'] . ' days'));
 
@@ -132,11 +139,14 @@ class AlerteService
                     'canal'           => $canal,
                     'sujet'           => mb_substr($sujet, 0, 200),
                     'message'         => $texte,
-                    'genere_par_ia'   => 0,
+                    'genere_par_ia'   => $genereParIa,
                     'statut'          => 'a_envoyer',
                 ]);
                 $this->db->affectedRows() > 0 ? $stats['creees']++ : $stats['doublons']++;
             }
+        }
+        if ($genereParIa === 1) {
+            audit_log('alerte_redigee_ia', 'alertes', $contratId, null, ['regle_code' => $regle['code'] ?? null], 'ia');
         }
     }
 

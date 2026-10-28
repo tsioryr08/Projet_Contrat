@@ -1,0 +1,55 @@
+MODIFICATIONS EFFECTUÉES - Alerte IA + Score de risque
+
+FICHIERS AJOUTÉS
+-----------------
+- app/Services/AlerteRedacteurService.php
+- app/Services/RisqueService.php
+
+FICHIERS MODIFIÉS
+-----------------
+- app/Services/AlerteService.php
+- app/Commands/GenererAlertes.php
+- app/Controllers/Analyse.php
+- app/Controllers/Alertes.php
+- app/Views/alertes/index.php
+- app/Views/analyse/fiche.php
+- app/Models/RecommandationIaModel.php (restauré/compatibilisé avec schéma existant)
+
+DÉTAILS PAR FONCTIONNALITÉ
+
+A) MESSAGE D'ALERTE RÉDIGÉ PAR L'IA
+- AlerteRedacteurService::rediger(array $contrat, string $codeRegle, bool $confidentiel) retourne ['sujet','message','genere_par_ia']
+- Utilise le même client API que IaService (env: ia.apiKey, ia.fournisseur, ia.model). Appel direct via curlrequest (Gemini/Anthropic). Timeout 15s.
+- Prompt impose: JSON {sujet,message}, max 120 mots, ton selon J30/J10/J0, doit contenir référence contrat + fournisseur + date limite non-reconduction au format JJ/MM/AAAA + jours restants + conséquence (reconduction tacite/pénalité/plafond) + action attendue. N'envoie que des champs structurés, jamais le PDF.
+- Validation stricte: doit contenir référence ET date JJ/MM/AAAA dans le message. Si invalide -> repli.
+- Repli automatique si: API échoue, délai >15s, JSON invalide, validation échoue. Si contrats.confidentiel = 1 -> aucun appel API, texte modèle.
+- Options: --sans-ia sur alertes:generer, plafond 20 appels IA/exécution (MAX_APPELS).
+- genere_par_ia = 1 uniquement si le texte IA est retenu, sinon 0.
+- audit_log('alerte_redigee_ia', 'alertes', contrat_id, ..., ['regle_code'=>...], 'ia') quand genere_par_ia==1.
+- AlerteService::alertesContrats() modifié pour charger fournisseur + confidentiel + jours_restants, appeler AlerteRedacteurService, passer genere_par_ia à creerAlertes().
+- creerAlertes() accepte genere_par_ia (défaut 0), l'insère dans alertes.genere_par_ia.
+- GenererAlertes accepte --sans-ia et le transmet à AlerteService.
+- Vue alertes/index.php: badge "Rédigé par l'IA" si genere_par_ia == 1.
+- IMPORTANT: Seul le chemin alertesContrats() est modifié. alertesObligations() conserve son format existant (c'est pourquoi les alertes obligation_id > 0 ne montrent pas ce nouveau format).
+
+B) SCORE DE RISQUE EXPLIQUÉ
+- RisqueService::calculer(int $contratId) calcule par règles PHP (sans IA) -> score 0-100, niveau (faible/moyen/eleve/critique), facteurs triés par points décroissants, résumé.
+- Barème avec constantes modifiables: base 10; reconduction tacite +20; préavis >=90/+15, >=60/+10, >=30/+5; échéance dépassée +30, <=10j +25, <=30j +15, <=60j +5; plafond pénalité +5; taux>=2% +5; montant>=50M MGA +5; litige ouvert +10; obligations en retard +5 chacune (max +15); pénalité découverte >30j +10; fournisseur suspendu +5, blacklisté +10; clauses IA non validées +5. Total plafonné à 100.
+- Niveaux: 0-29 faible, 30-54 moyen, 55-74 eleve, 75+ critique.
+- AnalyseController::donnees() appelle RisqueService::calculer(), met à jour contrats.score_risque uniquement si différent, log audit_log('recalcul_score','contrats',id,avant,apres,'systeme'). recalculer() idem.
+- Vue analyse/fiche.php: bloc "Score de risque" avec x/100, barre colorée, badge niveau, tableau facteurs trié par points décroissants, phrase de résumé.
+- RisqueService rendu tolérant aux schémas: litiges utilise etat_code, clauses IA cherche clauses_detectees ou clauses avec origine/source + validee.
+
+CORRECTIONS COMPATIBILITÉ
+- RecommandationIaModel restauré/compatibilisé: mapping action_recommandee <-> type_recommandation, statut <-> decision, decidee_par <-> decide_par, decidee_at <-> date_decision, allowedFields aligné au schéma existant.
+
+POINTS À VÉRIFIER POUR LE BUG "génération message IA ne marche pas"
+1. ia.apiKey dans .env (présent). ia.mode/ia.fournisseur/ia.model selon config.
+2. Pour les alertes CONTRAT (obligation_id=0), AlerteService::alertesContrats() utilise bien AlerteRedacteurService. Pour OBLIGATIONS (obligation_id>0), pas modifié -> format ancien.
+3. genere_par_ia ne devient 1 que si validation stricte OK (contient référence + date JJ/MM/AAAA dans message, JSON valide). Sinon repli -> 0. C'est voulu.
+4. Si contrat.confidentiel==1 -> pas d'appel IA -> 0.
+5. --sans-ia force modèle -> 0.
+6. Plafond 20 appels/exécution peut bloquer appels IA.
+7. Timeout 15s.
+8. Le badge "Rédigé par l'IA" n'apparaît que si genere_par_ia==1 dans /alertes.
+9. Pour voir un cas généré par IA: supprimer alerte contrat existante, lancer sans --sans-ia avec clé valide, vérifier alertes.genere_par_ia et message.

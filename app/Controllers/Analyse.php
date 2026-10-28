@@ -7,6 +7,7 @@ use App\Models\ContratModel;
 use App\Models\RecommandationIaModel;
 use App\Services\AnalyseService;
 use App\Services\ContratService;
+use App\Services\RisqueService;
 use CodeIgniter\Exceptions\PageNotFoundException;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -16,11 +17,13 @@ class Analyse extends BaseController
 {
     private AnalyseService $service;
     private RecommandationIaModel $recos;
+    private RisqueService $risque;
 
     public function __construct()
     {
         $this->service = new AnalyseService();
         $this->recos   = new RecommandationIaModel();
+        $this->risque  = new RisqueService();
     }
 
     public function fiche(int $id)
@@ -57,7 +60,15 @@ class Analyse extends BaseController
     public function recalculer(int $id)
     {
         $d = $this->donnees($id);
-        (new ContratModel())->update($id, ['score_risque' => $d['score']]);
+        $ancien = (int) ($d['contrat']['score_risque'] ?? -1);
+        $nouveau = (int) $d['scoreRisqueExplique']['score'];
+        $cm = new ContratModel();
+        if ($ancien !== $nouveau) {
+            $cm->update($id, ['score_risque' => $nouveau]);
+            audit_log('recalcul_score', 'contrats', $id, ['score_risque' => $ancien], ['score_risque' => $nouveau], 'systeme');
+        } else {
+            $cm->update($id, ['score_risque' => $nouveau]);
+        }
         return redirect()->to('analyse/fiche/' . $id)->with('succes', 'Score recalculé.');
     }
 
@@ -176,6 +187,17 @@ class Analyse extends BaseController
             (new ContratModel())->update($id, ['score_risque' => $eval['score']]);
         }
 
+        $risqueExplique = $this->risque->calculer($id);
+        $ancienScore = (int) ($c['score_risque'] ?? -1);
+        if ($ancienScore !== (int) $risqueExplique['score']) {
+            (new ContratModel())->update($id, ['score_risque' => (int) $risqueExplique['score']]);
+            audit_log('recalcul_score', 'contrats', $id, ['score_risque' => $ancienScore], ['score_risque' => (int) $risqueExplique['score']], 'systeme');
+            $c['score_risque'] = $risqueExplique['score'];
+        } elseif ($c['score_risque'] === null) {
+            (new ContratModel())->update($id, ['score_risque' => (int) $risqueExplique['score']]);
+            $c['score_risque'] = $risqueExplique['score'];
+        }
+
         $cc  = $this->recos->colonne('contrat_id');
         $rec = [];
         foreach ($cc ? $this->recos->where($cc, $id)->orderBy('id', 'DESC')->findAll() : [] as $r) {
@@ -201,6 +223,7 @@ class Analyse extends BaseController
             'recos'        => $rec,
             'typesClause'  => \App\Models\ClauseModel::TYPES,
             'peutRecommander' => in_array($niveau['code'] ?? '', ['depasse', 'urgent', 'a_examiner'], true),
+            'scoreRisqueExplique' => $risqueExplique,
         ];
     }
 }

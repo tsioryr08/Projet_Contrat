@@ -26,24 +26,28 @@ $decisionsFaites = array_keys(AnalyseService::DECISIONS);
     </div>
 </div>
 
-<div class="row g-3 mb-3">
-    <div class="col-md-4">
-        <div class="card h-100 text-center"><div class="card-body">
-            <div class="text-muted small">Score de risque</div>
-            <div class="display-4"><?= $score ?><small class="fs-5">/100</small></div>
-            <span class="badge <?= $cl[$niveauRisque] ?>"><?= esc(AnalyseService::RISQUES[$niveauRisque]) ?></span>
-            <div class="progress mt-3"><div class="progress-bar <?= $cl[$niveauRisque] ?>" style="width: <?= $score ?>%"></div></div>
-            <?php if ($niveau): ?><div class="mt-3"><span class="badge <?= $niveau['classe'] ?>"><?= esc($niveau['label']) ?></span>
-                <small class="text-muted">échéance le <?= date_fr($contrat['date_limite_non_reconduction']) ?></small></div><?php endif; ?>
-        </div></div>
-    </div>
-    <div class="col-md-8">
-        <div class="card h-100"><div class="card-header">Points d'attention</div>
-            <ul class="list-group list-group-flush">
-                <?php if (! $points): ?><li class="list-group-item text-muted">Aucun point d'attention.</li><?php endif; ?>
-                <?php foreach ($points as $p): ?><li class="list-group-item <?= $gr[$p['gravite']] ?>"><?= esc($p['texte']) ?></li><?php endforeach; ?>
-            </ul>
+<div class="card mb-3">
+    <div class="card-header">Score de risque</div>
+    <div class="card-body">
+        <?php $sr = $scoreRisqueExplique ?? null; $sre = $sr['score'] ?? $score; $nre = $sr['niveau'] ?? $niveauRisque; $fac = $sr['facteurs'] ?? []; $res = $sr['resume'] ?? ''; ?>
+        <div class="d-flex align-items-center gap-3 mb-2">
+            <div class="display-6 mb-0"><?= (int)$sre ?><small class="fs-6">/100</small></div>
+            <span class="badge <?= $cl[$nre] ?>"><?= esc(AnalyseService::RISQUES[$nre] ?? $nre) ?></span>
         </div>
+        <div class="progress mb-3"><div class="progress-bar <?= $cl[$nre] ?>" style="width: <?= (int)$sre ?>%"></div></div>
+        <?php if (! empty($fac)): ?>
+            <div class="table-responsive mb-2">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Facteur</th><th class="text-end">Points</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($fac as $f): ?>
+                        <tr><td><?= esc($f['libelle']) ?></td><td class="text-end"><?= (int)$f['points'] ?></td></tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
+        <?php if ($res !== ''): ?><p class="mb-0"><?= esc($res) ?></p><?php endif; ?>
     </div>
 </div>
 

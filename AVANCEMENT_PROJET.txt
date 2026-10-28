@@ -1,0 +1,114 @@
+# AVANCEMENT DU PROJET - SUIVI DES CONTRATS FOURNISSEURS
+
+Date de génération : 2026-10-28
+Branche actuelle : feature-oli
+Stack : PHP 8.4 + CodeIgniter 4.7.2 + MySQL/MariaDB 10.4
+
+Ce document permet à toute personne de comprendre rapidement où en est le projet sans devoir relire tout le contexte.
+
+## 1. Vue d'ensemble
+
+Le projet vise à gérer le suivi des contrats fournisseurs avec alertes J-30/J-10/J-0, workflow de litiges, extraction IA de clauses et tableau de bord des échéances.
+
+Répartition : **Olivier** (socle, contrats, alertes, litiges, IA, tableau de bord) / **Tsiory** (gabarit, référentiels, suivi, exports, documentation).
+
+## 2. Base de données
+
+### Migrations présentes
+| Migration | Description |
+|---|---|
+| 2026-10-23-090001_CreateOrganisation | roles, services, utilisateurs |
+| 2026-10-23-090002_CreateFournisseursEtTypes | fournisseurs, fournisseur_contacts, fournisseur_evaluations, types_contrat |
+| 2026-10-23-090003_CreateContrats | contrats, clauses, avenants, contrats_historique, obligations |
+| 2026-10-23-090004_CreateAlertes | alertes_regles, alertes |
+| 2026-10-23-090005_CreateLitiges | litiges, litiges_historique, litige_etats, litige_transitions |
+| 2026-10-23-090006_CreateDocumentsEtIa | documents, extractions_ia, recommandations_ia |
+| 2026-10-23-090007_CreateJournalAudit | journal_audit |
+| 2026-10-23-090008_CreateVueEcheances | vue v_echeances |
+| 2026-10-24-090001_AddUniqueFournisseurs | Index uniques NIF/STAT sur fournisseurs |
+| 2026-10-26-090001_AddConfidentielDocuments | Ajout champ confidentiel sur documents |
+| 2026-10-26-090002_CreateExtractionsIa | Table extractions_ia (mise à jour IA) |
+
+### Données de référence / démo
+- `ReferentielSeeder` : rôles, règles d'alertes (J30/J10/J0), états litige/transitions, types de contrat, etc.
+- `DemoSeeder` : 5 utilisateurs, 6 services, 20 fournisseurs, ~250 contrats, ~150 obligations, 6 litiges, 10 pénalités
+- `DatabaseSeeder` orchestre les seeders
+
+## 3. État par partie
+
+### Partie OLIVIER (O1-O7)
+| Tâche | Module | Contrôleur | Vues | État |
+|---|---|---|---|---|
+| O1 | Authentification, rôles, filtres | `Auth.php` | `auth/` | **Présent** (connexion/déconnexion, filtres AuthFilter/RoleFilter) |
+| O2 | Contrats (cycle de vie, formulaire, liste, fiche) | `Contrats.php` | `contrats/` | **Présent** |
+| O3 | Alertes J-30/J-10/J-0 (commande `php spark alertes:generer`) | `Alertes.php` | `alertes/` | **Présent** |
+| O4 | Workflow litige | `Litiges.php` | `litiges/` | **Présent** |
+| O5 | Extraction IA de clauses | `Ia.php` | `ia/` | **Présent** (avec smalot/pdfparser) |
+| O6 | Tableau de bord des échéances | `Dashboard.php` | `dashboard/` | **Présent** |
+| O7 | Fiche d'analyse IA / recommandations | `Analyse.php` | `analyse/` | **Présent** |
+
+### Partie TSIORY (T1-T15)
+| Tâche | Module | Contrôleur/Modèle | Vues | État |
+|---|---|---|---|---|
+| T1 | Gabarit, menu, badges, pagination, confirmations | `Helpers/ui_helper.php`, `Layouts/main` | `layouts/`, `partials/` | **Terminé** |
+| T2 | Journal d'audit | `Audit.php`, `AuditModel.php`, `Helpers/audit_helper.php` | `audit/` | **Terminé** |
+| T3 | Services | `Services.php`, `ServiceModel.php` | `services/` | **Terminé** |
+| T4 | Fournisseurs | `Fournisseurs.php`, `FournisseurModel.php` | `fournisseurs/` (index, form, fiche) | **Terminé** |
+| T5 | Contacts fournisseur | `FournisseurContacts.php`, `FournisseurContactModel.php` | `fournisseurs/contacts.php` | **Terminé** |
+| T6 | Évaluations fournisseur | `FournisseurEvaluations.php`, `FournisseurEvaluationModel.php` | `fournisseurs/evaluations.php` | **Terminé** |
+| T7 | Types de contrat | `TypesContrat.php`, `TypeContratModel.php` | `types_contrat/` | **Terminé** |
+| T8 | Règles d'alertes | `AlertesRegles.php`, `AlerteRegleModel.php` | `alertes_regles/` | **Terminé** |
+| T9 | Obligations | `Obligations.php`, `ObligationModel.php` | `obligations/` | **Terminé** |
+| T10 | Pénalités | `Penalites.php`, `PenaliteModel.php` | `penalites/` | **Terminé** |
+| T11 | Gestion utilisateurs | `Utilisateurs.php` | `utilisateurs/` | **Terminé** |
+| T12 | Données de démo | `Database/Seeds/DemoSeeder.php` | - | **Terminé** |
+| T13 | Exports CSV | `Exports.php`, `Services/CsvService.php` | Boutons sur listes | **Terminé** |
+| T14 | Documentation | - | - | **À faire** |
+| T15 | Recette finale | - | - | **À faire** |
+
+## 4. Routes principales (fusionnées)
+
+Routes centralisées dans `app/Config/Routes.php` avec filtres par rôle (`auth`, `role:...`).
+
+**Partie Olivier** : `/connexion`, `/dashboard`, `/alertes`, `/contrats`, `/litiges`, `/ia`, `/analyse`
+**Partie Tsiory** : `/audit`, `/services`, `/fournisseurs`, `/types-contrat`, `/alertes-regles`, `/obligations`, `/penalites`, `/utilisateurs`, `/exports/*`
+**Tests/Démo** : `/demo` (à retirer avant rendu)
+
+## 5. Fonctionnalités clés opérationnelles
+
+### Tsiory (référentiels + suivi)
+- **Fournisseurs** : CRUD complet, validation NIF/STAT/téléphone, unicité, contacts, évaluations, liste contrats
+- **Services** : CRUD avec responsable, refus suppression si utilisé, audit
+- **Types de contrat** : CRUD par famille, activation/désactivation, valeurs par défaut
+- **Règles d'alertes** : paramétrage J30/J10/J0 (jours, gravité, notifier supérieur, actif)
+- **Obligations** : CRUD depuis fiche contrat/liste globale, filtres, statut automatique en_retard (par commande Olivier), suppression cascade alertes
+- **Pénalités** : CRUD, calcul retard découverte (rouge > 30j), totaux par statut, lien litige facultatif
+- **Utilisateurs** : CRUD, hash mot de passe, réinitialisation, désactivation impossible si soi-même, filtrage par rôle
+- **Exports CSV** : fournisseurs, contrats, pénalités, obligations, échéances (UTF-8 BOM, point-virgule)
+
+### Olivier (métier contrats)
+- **Authentification** : rôles admin/juriste/responsable/direction/lecteur, filtres
+- **Contrats** : formulaire, transitions de cycle de vie, historique, clauses
+- **Alertes** : génération via commande, lecture/traitement
+- **Litiges** : workflow signalement→qualification→médiation→résolution→archivage, transitions contrôlées
+- **IA** : upload PDF/DOCX, extraction, validation humaine, confidentiel protégé
+- **Tableau de bord** : vue échéances, niveaux
+- **Analyse IA** : recommandations, décision humaine
+
+### Transversal
+- **Audit** : `audit_log()` sur créations/modifications/suppressions, écran `/audit` (admin/direction)
+- **Gabarit** : `layouts/main`, menu par rôle, badges, pagination Bootstrap
+- **Sessions simulées** : `/demo` disponible
+
+## 6. État global
+
+| Catégorie | État |
+|---|---|
+| Socle technique/authentification | **Opérationnel** (partie Olivier) |
+| Référentiels Tsiory (T1-T8) | **Majoritairement terminé** |
+| Suivi Tsiory (T9-T11) | **Terminé** |
+| Exports/Démo (T12-T13) | **Terminé** |
+| Documentation/Recette (T14-T15) | **À faire** |
+| Contrats/Litiges/Alertes/IA/Tableau de bord (O2-O7) | **Présent dans codebase** (à valider/intégrer selon avancement Olivier) |
+
+**Synthèse** : L'essentiel des fonctionnalités Tsiory est implémenté et fusionné avec la branche Olivier. Les modules métier d'Olivier sont présents. Il reste principalement T14 (documentation) et T15 (recette finale), ainsi que validation/intégration croisée entre les deux parties.

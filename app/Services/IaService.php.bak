@@ -1,0 +1,322 @@
+<?php
+
+namespace App\Services;
+
+use RuntimeException;
+use Throwable;
+
+class IaService
+{
+    public const VERSION_PROMPT = 'v1';
+
+    public function simulation(): bool
+    {
+        return strtolower((string) env('ia.mode', 'simulation')) !== 'reel';
+    }
+
+    public function fournisseur(): string
+    {
+        return strtolower((string) env('ia.fournisseur', 'gemini')) === 'anthropic' ? 'anthropic' : 'gemini';
+    }
+
+    public function listeModeles(): array
+    {
+        $liste = trim((string) env('ia.modeles', ''));
+        if ($liste !== '') {
+            $parts = array_map('trim', explode(',', $liste));
+            $parts = array_values(array_filter($parts, fn($v) => $v !== ''));
+            if (! empty($parts)) {
+                $out = [];
+                foreach ($parts as $p) {
+                    if (! in_array($p, $out, true)) {
+                        $out[] = $p;
+                    }
+                }
+                return $out;
+            }
+        }
+        $principal = $this->modele();
+        $secours = trim((string) env('ia.modelSecours', ''));
+        $out = [$principal];
+        if ($secours !== '' && $secours !== $principal) {
+            $out[] = $secours;
+        }
+        return $out;
+    }
+
+    /** @return array{json: array, brut: string, tokens_entree: int, tokens_sortie: int, duree_ms: int} */
+    public function extraire(string $texte): array
+    {
+        $t0 = microtime(true);
+
+        if ($this->simulation()) {
+            return $this->resultat($this->jsonSimule(), 0, 0, $t0);
+        }
+
+        $cle = (string) env('ia.apiKey', '');
+        if ($cle === '') {
+            throw new RuntimeException('Clé API absente (.env : ia.apiKey).');
+        }
+
+        $hash = hash('sha256', $texte);
+        $db = \Config\Database::connect();
+        try {
+            $cache = $db->table('extractions_ia')->select('resultat_json, tokens_entree, tokens_sortie, duree_ms')->like('resultat_json', $hash, 'both')->orderBy('id', 'DESC')->limit(1)->get()->getRowArray();
+            if ($cache && ! empty($cache['resultat_json'])) {
+                $jsonCache = json_decode($cache['resultat_json'], true);
+                if (is_array($jsonCache)) {
+                    return [
+                        'json'          => $jsonCache,
+                        'brut'          => $cache['resultat_json'],
+                        'tokens_entree' => (int) ($cache['tokens_entree'] ?? 0),
+                        'tokens_sortie' => (int) ($cache['tokens_sortie'] ?? 0),
+                        'duree_ms'      => (int) round((microtime(true) - $t0) * 1000),
+                    ];
+                }
+            }
+        } catch (Throwable $e) {
+        }
+
+        $modeles = $this->listeModeles();
+        if (empty($modeles)) {
+            $modeles = [$this->modele()];
+        }
+
+        $dernierErreur = null;
+        $debutGlobal = microtime(true);
+        $index = 0;
+        while ($index < count($modeles)) {
+            if ((microtime(true) - $debutGlobal) > 40) {
+                break;
+            }
+            $modeleTeste = $modeles[$index];
+            $index++;
+            try {
+                if ($this->fournisseur() === 'gemini') {
+                    [$txt, $in, $out] = $this->appelGeminiAvecModele($cle, $texte, $modeleTeste);
+                } else {
+                    [$txt, $in, $out] = $this->appelAnthropicAvecModele($cle, $texte, $modeleTeste);
+                }
+                $txt  = trim((string) preg_replace('/^```(?:json)?|```$/m', '', $txt));
+                $debut = strpos($txt, '{');
+                $fin = strrpos($txt, '}');
+                if ($debut !== false && $fin !== false && $fin > $debut) {
+                    $txt = substr($txt, $debut, $fin - $debut + 1);
+                }
+                $json = json_decode($txt, true);
+                if (! is_array($json)) {
+                    throw new RuntimeException('Réponse IA invalide : JSON non exploitable.');
+                }
+                $json['_cache_hash'] = $hash;
+                return $this->resultat($json, $in, $out, $t0);
+            } catch (RuntimeException $e) {
+                $dernierErreur = $e;
+                $msg = $e->getMessage();
+                if (stripos($msg, 'surcharg') !== false || preg_match('/\b(429|500|503)\b/', $msg)) {
+                    usleep(2000000);
+                    continue;
+                }
+                if ($index >= count($modeles) || (microtime(true) - $debutGlobal) > 40) {
+                    break;
+                }
+                usleep(2000000);
+                continue;
+            }
+        }
+
+        if ($dernierErreur instanceof RuntimeException && (stripos($dernierErreur->getMessage(), 'surcharg') !== false || preg_match('/\b(429|500|503)\b/', $dernierErreur->getMessage()))) {
+            throw new RuntimeException('L\'IA est momentanément indisponible : votre document est conservé. Réessayez plus tard ou saisissez le contrat à la main.');
+        }
+        if ($dernierErreur) {
+            $msg = $dernierErreur->getMessage();
+            if (stripos($msg, '429') !== false || stripos($msg, '503') !== false || stripos($msg, '500') !== false || stripos($msg, 'délai') !== false || stripos($msg, 'timeout') !== false) {
+                throw new RuntimeException('L\'IA est momentanément indisponible : votre document est conservé. Réessayez plus tard ou saisissez le contrat à la main.');
+            }
+            throw $dernierErreur;
+        }
+        throw new RuntimeException('L\'IA est momentanément indisponible : votre document est conservé. Réessayez plus tard ou saisissez le contrat à la main.');
+    }
+
+    /** @return array{0:string,1:int,2:int} */
+    private function appelGeminiAvecModele(string $cle, string $texte, string $modele): array
+    {
+        $url = 'https://generativelanguage.googleapis.com/v1beta/models/'
+             . rawurlencode($modele) . ':generateContent?key=' . rawurlencode($cle);
+
+        $corps = $this->post($url, [
+            'Content-Type' => 'application/json',
+        ], [
+            'systemInstruction' => ['parts' => [['text' => $this->systeme()]]],
+            'contents'          => [['role' => 'user', 'parts' => [['text' => "Contrat :\n\n" . $texte]]]],
+            'generationConfig'  => [
+                'responseMimeType' => 'application/json',
+                'temperature'      => 0.1,
+                'maxOutputTokens'  => 8000,
+                'thinkingConfig'   => ['thinkingBudget' => 0],
+            ],
+        ]);
+
+        $txt = '';
+        foreach ($corps['candidates'][0]['content']['parts'] ?? [] as $p) {
+            $txt .= $p['text'] ?? '';
+        }
+        if ($txt === '') {
+            $txt .= $corps['candidates'][0]['content']['thought'] ?? '';
+        }
+        if ($txt === '') {
+            $raison = $corps['promptFeedback']['blockReason'] ?? ($corps['candidates'][0]['finishReason'] ?? 'réponse vide');
+            throw new RuntimeException('Gemini n\'a renvoyé aucun texte (' . $raison . ').');
+        }
+
+        return [
+            $txt,
+            (int) ($corps['usageMetadata']['promptTokenCount'] ?? 0),
+            (int) ($corps['usageMetadata']['candidatesTokenCount'] ?? 0),
+        ];
+    }
+
+    /** @return array{0:string,1:int,2:int} */
+    private function appelAnthropicAvecModele(string $cle, string $texte, string $modele): array
+    {
+        $corps = $this->post('https://api.anthropic.com/v1/messages', [
+            'x-api-key'         => $cle,
+            'anthropic-version' => '2023-06-01',
+            'Content-Type'      => 'application/json',
+        ], [
+            'model'      => $modele,
+            'max_tokens' => 4000,
+            'system'     => $this->systeme(),
+            'messages'   => [['role' => 'user', 'content' => "Contrat :\n\n" . $texte]],
+        ]);
+
+        $txt = '';
+        foreach ($corps['content'] ?? [] as $bloc) {
+            if (($bloc['type'] ?? '') === 'text') {
+                $txt .= $bloc['text'];
+            }
+        }
+        return [$txt, (int) ($corps['usage']['input_tokens'] ?? 0), (int) ($corps['usage']['output_tokens'] ?? 0)];
+    }
+
+    // ------------------------------------------------------------ Commun
+    private function post(string $url, array $headers, array $json, bool $secours = false): array
+    {
+        $delais = [0, 2, 5];
+        $derniereErreur = '';
+        $derniereReponse = '';
+
+        for ($i = 0; $i < 3; $i++) {
+            if ($delais[$i] > 0) {
+                sleep($delais[$i]);
+            }
+            try {
+                $payload = json_encode($json, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $headerLines = array_map(function ($k, $v) { return $k . ': ' . $v; }, array_keys($headers), $headers);
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headerLines);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 90);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+                $corpsBrut = curl_exec($ch);
+                if ($corpsBrut === false) {
+                    $err = curl_error($ch);
+                    curl_close($ch);
+                    $derniereErreur = $err;
+                    continue;
+                }
+                $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                $derniereReponse = is_string($corpsBrut) ? $corpsBrut : '';
+                if (in_array($code, [429, 500, 503], true) && $i < 2) {
+                    continue;
+                }
+                $corps = json_decode($corpsBrut, true);
+                if ($code !== 200 || ! is_array($corps)) {
+                    $msg = is_array($corps) ? ($corps['error']['message'] ?? '') : '';
+                    if ($code === 429) {
+                        $msg = 'Quota atteint, réessayez dans une minute. ' . $msg;
+                    }
+                    if (in_array($code, [429, 500, 503], true)) {
+                        throw new RuntimeException('SURCHARGE');
+                    }
+                    throw new RuntimeException("Erreur API ($code) : " . mb_substr($msg !== '' ? $msg : (string) $corpsBrut, 0, 300));
+                }
+                return $corps;
+            } catch (Throwable $e) {
+                $derniereErreur = $e->getMessage();
+                if ($e->getMessage() === 'SURCHARGE' && $i < 2) {
+                    continue;
+                }
+                if ($e->getMessage() === 'SURCHARGE') {
+                    break;
+                }
+                if ($i < 2 && stripos($derniereErreur, 'timeout') !== false) {
+                    continue;
+                }
+                if ($i < 2) {
+                    continue;
+                }
+                break;
+            }
+        }
+
+        throw new RuntimeException('Service IA momentanément surchargé, réessayez dans quelques minutes');
+    }
+
+    private function resultat(array $json, int $in, int $out, float $t0): array
+    {
+        return [
+            'json'          => $json,
+            'brut'          => json_encode($json, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'tokens_entree' => $in,
+            'tokens_sortie' => $out,
+            'duree_ms'      => (int) round((microtime(true) - $t0) * 1000),
+        ];
+    }
+
+    private function systeme(): string
+    {
+        return <<<TXT
+Tu es un assistant juridique. Tu extrais les informations d'un contrat fournisseur.
+Réponds UNIQUEMENT par un objet JSON valide, sans texte autour ni balises. Si une information est absente, mets null.
+Dates au format AAAA-MM-JJ. Montants en nombre. reconduction_tacite vaut true ou false.
+Format attendu :
+{
+ "parties": {"fournisseur": "...", "service": "..."},
+ "type": "...", "intitule": "...", "objet": "...",
+ "montant": 0, "devise": "MGA", "duree_mois": 0,
+ "date_signature": null, "date_debut": null, "date_fin": null,
+ "preavis_jours": 0, "reconduction_tacite": false, "penalites": "...",
+ "clauses": [{"type_clause": "reconduction|preavis|resiliation|penalite|paiement|confidentialite|propriete_intellectuelle|responsabilite|force_majeure|juridiction|autre", "texte": "...", "page": 1, "confiance": 0.0}],
+ "confiance": {"intitule": 0.0, "montant": 0.0, "date_debut": 0.0, "date_fin": 0.0, "preavis_jours": 0.0, "reconduction_tacite": 0.0}
+}
+La confiance est un nombre entre 0 et 1.
+TXT;
+    }
+
+    private function jsonSimule(): array
+    {
+        $debut = date('Y-m-d', strtotime('-6 months'));
+        $fin   = date('Y-m-d', strtotime('+18 months'));
+        return [
+            'parties'  => ['fournisseur' => 'Fournisseur de démonstration', 'service' => 'Achats'],
+            'type'     => 'Maintenance',
+            'intitule' => 'Contrat de maintenance (simulation)',
+            'objet'    => 'Maintenance préventive et corrective des équipements.',
+            'montant'  => 12000000, 'devise' => 'MGA', 'duree_mois' => 24,
+            'date_signature' => $debut, 'date_debut' => $debut, 'date_fin' => $fin,
+            'preavis_jours' => 60, 'reconduction_tacite' => true,
+            'penalites' => 'Pénalité de 1 % par semaine de retard, plafonnée à 10 %.',
+            'clauses' => [
+                ['type_clause' => 'reconduction', 'texte' => 'Le contrat est reconduit tacitement pour des périodes de 12 mois.', 'page' => 3, 'confiance' => 0.93],
+                ['type_clause' => 'preavis',      'texte' => 'Préavis de 60 jours avant le terme par lettre recommandée.',       'page' => 3, 'confiance' => 0.88],
+                ['type_clause' => 'penalite',     'texte' => 'Pénalité de 1 % par semaine de retard, plafonnée à 10 %.',          'page' => 5, 'confiance' => 0.74],
+                ['type_clause' => 'juridiction',  'texte' => 'Tribunal de commerce d\'Antananarivo.',                             'page' => 8, 'confiance' => 0.61],
+            ],
+            'confiance' => ['intitule' => 0.9, 'montant' => 0.85, 'date_debut' => 0.9, 'date_fin' => 0.9, 'preavis_jours' => 0.88, 'reconduction_tacite' => 0.93],
+        ];
+    }
+}

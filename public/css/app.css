@@ -1,13 +1,777 @@
-/* Feuille de style commune (T1) – complète Bootstrap 5 */
-body { background-color: #f5f6f8; }
+/* ===================================================
+   FEUILLE DE STYLE LUXUEUX & ÉLÉGANT - PROJET CONTRATS
+   Affinage poussé : titres extravagants, header premium, diagramme thématisé
+   =================================================== */
 
-.badge-niveau { font-size: .8rem; padding: .4em .7em; font-weight: 600; }
-.badge-ok         { background-color: #198754; color: #fff; }   /* vert */
-.badge-a_examiner { background-color: #fd7e14; color: #fff; }   /* orange */
-.badge-urgent     { background-color: #dc3545; color: #fff; }   /* rouge */
-.badge-depasse    { background-color: #6c757d; color: #fff; }   /* gris */
+/* ---------------------------------------------------
+   1. VARIABLES CSS GLOBALES (:root)
+   Système unifié pour couleurs, polices, espacements, ombres
+   --------------------------------------------------- */
+:root {
+  /* Couleurs de base */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #FAFBFC;
+  --bg-surface: #FFFFFF;
+  --bg-subtle: #F8FAFD;
+
+  /* Dégradés doux entre bleu et vert pastel */
+  --gradient-primary: linear-gradient(135deg, #B9D4EC 0%, #C9E4D0 100%);
+  --gradient-accent: linear-gradient(90deg, #A8C5E2 0%, #9DC5C4 50%, #B8D8C4 100%);
+  --gradient-hero: linear-gradient(120deg, #FAFBFC 0%, #F1F7FF 50%, #F6FFF9 100%);
+  --gradient-title: linear-gradient(90deg, #1B2A41 0%, #2F4F7C 40%, #4F7C59 100%);
+  --gradient-header: linear-gradient(90deg, rgba(255,255,255,0.98) 0%, rgba(249,252,255,0.96) 50%, rgba(246,255,249,0.96) 100%);
+  --gradient-border: linear-gradient(90deg, #B9D4EC 0%, #9DC5C4 50%, #C9E4D0 100%);
+  --gradient-chart: linear-gradient(180deg, #B9D4EC 0%, #C9E4D0 100%);
+
+  /* Accents principaux */
+  --accent-blue: #A8C5E2;
+  --accent-blue-soft: #B9D4EC;
+  --accent-blue-deep: #8FB8DE;
+  --accent-green: #B8D8C4;
+  --accent-green-soft: #C9E4D0;
+  --accent-green-deep: #A3C9B5;
+  --accent-teal: #9DC5C4;
+  --accent-lavender: #C9C2E8;
+
+  /* Couleurs de texte */
+  --text-primary: #1B2A41;
+  --text-secondary: #2E3A46;
+  --text-muted: #5F6B7A;
+  --text-light: #7C8796;
+
+  /* Bordures & séparateurs */
+  --border-color: rgba(168, 197, 226, 0.35);
+  --border-subtle: rgba(27, 42, 65, 0.08);
+
+  /* Ombres douces et luxueuses */
+  --shadow-soft: 0 4px 20px rgba(168, 197, 226, 0.15);
+  --shadow-hover: 0 8px 30px rgba(143, 184, 222, 0.25);
+  --shadow-card: 0 6px 24px rgba(27, 42, 65, 0.06);
+  --shadow-focus: 0 0 0 0.25rem rgba(168, 197, 226, 0.25);
+  --shadow-header: 0 4px 18px rgba(143, 184, 222, 0.12);
+
+  /* Rayons arrondis */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  /* Transitions fluides */
+  --transition-base: all 0.3s ease;
+  --transition-smooth: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+
+  /* Typographie */
+  --font-heading: 'Cormorant Garamond', 'Bodoni Moda', 'Cinzel', Georgia, serif;
+  --font-body: 'Montserrat', 'Lato', 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Espacements généreux */
+  --spacing-xs: 0.5rem;
+  --spacing-sm: 0.75rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+}
+
+/* ---------------------------------------------------
+   2. FONDATIONS GÉNÉRALES
+   Base claire, aérée et raffinée
+   --------------------------------------------------- */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background: var(--gradient-hero);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-weight: 400;
+  line-height: 1.7;
+  letter-spacing: 0.01em;
+  min-height: 100vh;
+}
+
+/* Espacement entre les sections pour plus de respiration */
+main,
+.container,
+.container-fluid {
+  padding-top: var(--spacing-lg);
+  padding-bottom: var(--spacing-2xl);
+}
+
+/* ---------------------------------------------------
+   3. TYPOGRAPHIE LUXE EXTRAVAGANTE
+   Hiérarchie travaillée avec letter-spacing marqué et effet dégradé
+   --------------------------------------------------- */
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+  font-family: var(--font-heading);
+  color: var(--text-primary);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.25;
+  margin-bottom: var(--spacing-md);
+  text-transform: none;
+}
+
+/* Titre principal avec dégradé de texte (effet luxueux) */
+h1, .h1 {
+  font-size: clamp(2.2rem, 5vw, 3.6rem);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: var(--gradient-title);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  position: relative;
+  padding-bottom: var(--spacing-sm);
+}
+
+/* Petit élément décoratif sous h1 */
+h1::after,
+.h1::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 90px;
+  height: 2px;
+  background: var(--gradient-accent);
+  border-radius: 2px;
+  box-shadow: 0 2px 12px rgba(168, 197, 226, 0.25);
+}
+
+h2, .h2 {
+  font-size: clamp(1.9rem, 4vw, 2.6rem);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #1B2A41 0%, #3F5D8A 50%, #5B8C6F 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  position: relative;
+  padding-bottom: var(--spacing-xs);
+}
+
+/* Élément décoratif sous h2 */
+h2::after,
+.h2::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 70px;
+  height: 1.5px;
+  background: var(--gradient-accent);
+  border-radius: 2px;
+  opacity: 0.9;
+}
+
+h3, .h3 {
+  font-size: clamp(1.6rem, 3vw, 2.1rem);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+h4, .h4 {
+  font-size: clamp(1.35rem, 2.2vw, 1.7rem);
+  letter-spacing: 0.06em;
+}
+
+h5, .h5 {
+  font-size: clamp(1.15rem, 1.8vw, 1.4rem);
+  letter-spacing: 0.05em;
+}
+
+h6, .h6 {
+  font-size: clamp(1.05rem, 1.4vw, 1.2rem);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+p,
+.lead {
+  color: var(--text-secondary);
+  font-size: 0.98rem;
+}
+
+small,
+.text-muted {
+  color: var(--text-muted) !important;
+}
+
+strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------
+   4. HEADER PLUS LUXUEUX, PLUS COMPACT ET COLORÉ
+   Glassmorphism subtil, dégradé, ombre élégante
+   --------------------------------------------------- */
+.navbar {
+  background: var(--gradient-header) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: none;
+  border-bottom: 1px solid transparent;
+  position: relative;
+  z-index: 1050;
+  box-shadow: var(--shadow-header);
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+  min-height: 68px;
+  transition: var(--transition-base);
+}
+
+/* Bordure inférieure en dégradé pour un effet premium */
+.navbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 1px;
+  background: var(--gradient-border);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.navbar .dropdown-menu {
+  z-index: 1060;
+}
+
+.navbar .dropdown {
+  position: relative;
+}
+
+.navbar-brand {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-primary) !important;
+  padding: 0.3rem 0;
+}
+
+.navbar-nav .nav-link {
+  color: var(--text-secondary) !important;
+  font-weight: 500;
+  font-size: 0.92rem;
+  letter-spacing: 0.02em;
+  padding: 0.4rem 0.8rem !important;
+  margin: 0 0.2rem;
+  border-radius: var(--radius-sm);
+  position: relative;
+  transition: var(--transition-smooth);
+}
+
+/* Soulignement animé au hover */
+.navbar-nav .nav-link::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0.25rem;
+  width: 0;
+  height: 1px;
+  background: var(--gradient-accent);
+  transition: var(--transition-smooth);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.navbar-nav .nav-link:hover,
+.navbar-nav .nav-link:focus {
+  color: var(--text-primary) !important;
+  background: linear-gradient(90deg, rgba(168, 197, 226, 0.16) 0%, rgba(201, 228, 208, 0.12) 100%);
+}
+
+.navbar-nav .nav-link:hover::after,
+.navbar-nav .nav-link:focus::after {
+  width: 60%;
+}
+
+.navbar-nav .nav-link.active {
+  color: var(--text-primary) !important;
+  background: linear-gradient(90deg, rgba(185, 212, 236, 0.28) 0%, rgba(201, 228, 208, 0.22) 100%);
+  font-weight: 600;
+}
+
+.navbar-nav .nav-link.active::after {
+  width: 70%;
+}
+
+.navbar-toggler {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.6rem;
+}
+
+.navbar-toggler:focus {
+  box-shadow: var(--shadow-focus);
+}
+
+/* ---------------------------------------------------
+   5. BOUTONS
+   Dégradés doux, ombres élégantes, transitions fluides
+   --------------------------------------------------- */
+.btn {
+  font-family: var(--font-body);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 1.25rem;
+  border: 1px solid transparent;
+  transition: var(--transition-smooth);
+  box-shadow: none;
+}
+
+.btn:focus,
+.btn:focus-visible {
+  box-shadow: var(--shadow-focus) !important;
+  outline: none;
+}
+
+.btn-primary {
+  background: var(--gradient-accent);
+  color: var(--text-primary);
+  border: none;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+  background: linear-gradient(90deg, #9FC0E4 0%, #B9DCCB 100%);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-soft);
+}
+
+.btn-outline-primary {
+  color: var(--text-primary);
+  border: 1px solid rgba(143, 184, 222, 0.8);
+  background: transparent;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary:focus {
+  background: linear-gradient(90deg, rgba(168, 197, 226, 0.22) 0%, rgba(201, 228, 208, 0.18) 100%);
+  border-color: rgba(143, 184, 222, 0.95);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-soft);
+  transform: translateY(-1px);
+}
+
+.btn-outline-secondary {
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+}
+
+.btn-outline-secondary:hover,
+.btn-outline-secondary:focus {
+  background: linear-gradient(90deg, rgba(168, 197, 226, 0.16) 0%, rgba(250, 251, 252, 0.9) 100%);
+  color: var(--text-primary);
+  border-color: rgba(143, 184, 222, 0.7);
+  box-shadow: var(--shadow-soft);
+  transform: translateY(-1px);
+}
+
+.btn-outline-success {
+  color: var(--text-primary);
+  border: 1px solid rgba(163, 201, 181, 0.9);
+  background: transparent;
+}
+
+.btn-outline-success:hover,
+.btn-outline-success:focus {
+  background: linear-gradient(90deg, rgba(184, 216, 196, 0.25) 0%, rgba(201, 228, 208, 0.2) 100%);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-soft);
+  transform: translateY(-1px);
+}
+
+.btn-outline-danger {
+  color: var(--text-primary);
+  border: 1px solid rgba(201, 194, 232, 0.9);
+  background: transparent;
+}
+
+.btn-outline-danger:hover,
+.btn-outline-danger:focus {
+  background: linear-gradient(90deg, rgba(201, 194, 232, 0.22) 0%, rgba(168, 197, 226, 0.16) 100%);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-soft);
+  transform: translateY(-1px);
+}
+
+.btn-sm {
+  padding: 0.4rem 0.9rem;
+  font-size: 0.875rem;
+}
+
+/* ---------------------------------------------------
+   6. CARTES (CARDS)
+   Coins arrondis, ombres douces, effet hover subtil
+   --------------------------------------------------- */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  transition: var(--transition-smooth);
+  overflow: hidden;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+}
+
+.card-header {
+  background: linear-gradient(90deg, rgba(250, 251, 252, 0.98) 0%, rgba(241, 247, 255, 0.9) 100%);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+  font-weight: 600;
+  letter-spacing: 0.015em;
+  padding: var(--spacing-md) var(--spacing-lg);
+}
+
+.card-body {
+  padding: var(--spacing-lg);
+  color: var(--text-secondary);
+}
+
+.card-footer {
+  background: transparent;
+  border-top: 1px solid var(--border-subtle);
+  padding: var(--spacing-md) var(--spacing-lg);
+}
+
+/* ---------------------------------------------------
+   7. FORMULAIRES
+   Inputs raffinés avec focus doux
+   --------------------------------------------------- */
+.form-label {
+  color: var(--text-primary);
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.01em;
+}
+
+.form-control,
+.form-select {
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(168, 197, 226, 0.5);
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  padding: 0.6rem 0.9rem;
+  font-family: var(--font-body);
+  transition: var(--transition-smooth);
+  box-shadow: none;
+}
+
+.form-control:hover,
+.form-select:hover {
+  border-color: rgba(143, 184, 222, 0.8);
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: rgba(143, 184, 222, 0.95);
+  box-shadow: var(--shadow-focus);
+  background-color: var(--bg-surface);
+}
+
+.form-control::placeholder {
+  color: var(--text-light);
+}
+
+.form-check-input {
+  border-color: rgba(143, 184, 222, 0.8);
+}
+
+.form-check-input:checked {
+  background-color: var(--accent-blue-deep);
+  border-color: var(--accent-blue-deep);
+}
+
+.form-check-input:focus {
+  box-shadow: var(--shadow-focus);
+}
+
+/* ---------------------------------------------------
+   8. TABLEAUX
+   Lignes aérées, entête subtile
+   --------------------------------------------------- */
+.table {
+  color: var(--text-secondary);
+  border-color: var(--border-subtle);
+  vertical-align: middle;
+}
+
+.table thead th {
+  background: linear-gradient(90deg, rgba(250, 251, 252, 0.98) 0%, rgba(241, 247, 255, 0.9) 100%);
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+  font-weight: 600;
+  letter-spacing: 0.015em;
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0.9rem 1rem;
+  white-space: nowrap;
+}
+
+.table tbody td {
+  padding: 0.85rem 1rem;
+  border-color: rgba(27, 42, 65, 0.06);
+}
+
+.table tbody tr {
+  transition: var(--transition-smooth);
+}
+
+.table-hover tbody tr:hover {
+  background: linear-gradient(90deg, rgba(168, 197, 226, 0.12) 0%, rgba(201, 228, 208, 0.08) 100%);
+}
+
+.table-responsive {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------
+   9. BADGES
+   Nuancés et élégants
+   --------------------------------------------------- */
+.badge {
+  font-family: var(--font-body);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: 0.45em 0.8em;
+  border-radius: 999px;
+  box-shadow: 0 2px 10px rgba(27, 42, 65, 0.04);
+}
+
+.badge-niveau {
+  font-size: 0.8rem;
+  padding: 0.4em 0.75em;
+  font-weight: 600;
+}
+
+/* Badges existants harmonisés avec la nouvelle palette */
+.badge-ok {
+  background: linear-gradient(90deg, #B8D8C4 0%, #C9E4D0 100%);
+  color: var(--text-primary);
+}
+
+.badge-a_examiner {
+  background: linear-gradient(90deg, #B9D4EC 0%, #C9DDF3 100%);
+  color: var(--text-primary);
+}
+
+.badge-urgent {
+  background: linear-gradient(90deg, #F5C6C6 0%, #F7D6D6 100%);
+  color: var(--text-primary);
+}
+
+.badge-depasse {
+  background: linear-gradient(90deg, #D6DCE3 0%, #E6EBF0 100%);
+  color: var(--text-primary);
+}
 
 /* Retard de détection supérieur à 30 jours (T10) */
-.texte-retard { color: #dc3545; font-weight: 700; }
+.texte-retard {
+  color: #B94A48;
+  font-weight: 700;
+}
 
-.table thead th { white-space: nowrap; }
+/* ---------------------------------------------------
+   10. DIAGRAMME EN BÂTONNETS - THÉMATISÉ
+   Barres en dégradé bleu->vert, axes et grille harmonisés
+   --------------------------------------------------- */
+#graphique {
+  max-width: 100%;
+}
+
+canvas#graphique {
+  filter: drop-shadow(0 4px 18px rgba(168, 197, 226, 0.12));
+}
+
+/* Harmonisation visuelle du chart container */
+.card .card-body canvas {
+  border-radius: var(--radius-md);
+}
+
+/* ---------------------------------------------------
+   11. ALERTES, PAGINATION & COMPOSANTS
+   Cohérents avec le thème
+   --------------------------------------------------- */
+.alert {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-card);
+}
+
+.pagination .page-link {
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  margin: 0 0.25rem;
+  border: 1px solid var(--border-subtle);
+  transition: var(--transition-smooth);
+}
+
+.pagination .page-link:hover {
+  background: linear-gradient(90deg, rgba(168, 197, 226, 0.18) 0%, rgba(201, 228, 208, 0.14) 100%);
+  color: var(--text-primary);
+}
+
+.pagination .page-item.active .page-link {
+  background: var(--gradient-accent);
+  border-color: transparent;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.dropdown-menu {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-hover);
+  z-index: 1070;
+}
+
+.dropdown-item {
+  transition: var(--transition-smooth);
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background: linear-gradient(90deg, rgba(168, 197, 226, 0.16) 0%, rgba(201, 228, 208, 0.12) 100%);
+  color: var(--text-primary);
+}
+
+.list-group-item {
+  border-color: rgba(27, 42, 65, 0.06);
+  transition: var(--transition-smooth);
+}
+
+.list-group-item:hover {
+  background: linear-gradient(90deg, rgba(168, 197, 226, 0.1) 0%, rgba(201, 228, 208, 0.08) 100%);
+}
+
+/* Offcanvas notifications plus luxueux */
+.offcanvas {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.offcanvas-header {
+  background: linear-gradient(90deg, rgba(250, 251, 252, 0.98) 0%, rgba(241, 247, 255, 0.9) 100%);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.offcanvas-title {
+  font-family: var(--font-heading);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* ---------------------------------------------------
+   12. MICRO-ANIMATIONS ÉLÉGANTES
+   Apparition douce et interactions subtiles
+   --------------------------------------------------- */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card,
+.table-responsive,
+.alert {
+  animation: fadeInUp 0.4s ease both;
+}
+
+/* ---------------------------------------------------
+   13. RESPONSIVE
+   Adaptations sur mobile
+   --------------------------------------------------- */
+@media (max-width: 992px) {
+  .navbar {
+    min-height: 64px;
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+
+  .navbar-nav .nav-link {
+    margin: 0.25rem 0;
+  }
+
+  .navbar-nav .nav-link::after {
+    display: none;
+  }
+
+  h1::after,
+  .h1::after,
+  h2::after,
+  .h2::after {
+    width: 60px;
+  }
+
+  .card-body {
+    padding: var(--spacing-md);
+  }
+
+  .table thead th,
+  .table tbody td {
+    padding: 0.75rem 0.8rem;
+  }
+}
+
+@media (max-width: 768px) {
+  h1, .h1 {
+    font-size: 2rem;
+    letter-spacing: 0.09em;
+  }
+
+  h2, .h2 {
+    font-size: 1.7rem;
+    letter-spacing: 0.08em;
+  }
+
+  h1::after,
+  .h1::after {
+    width: 50px;
+  }
+
+  h2::after,
+  .h2::after {
+    width: 45px;
+  }
+
+  .btn {
+    padding: 0.5rem 1rem;
+  }
+
+  .container,
+  .container-fluid {
+    padding-top: var(--spacing-md);
+    padding-bottom: var(--spacing-xl);
+  }
+}

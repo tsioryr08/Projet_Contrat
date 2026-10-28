@@ -104,6 +104,14 @@ class Ia extends BaseController
         if ($eid === 0) {
             return redirect()->to('ia')->with('erreur', "Document confidentiel : aucun envoi à l'IA.");
         }
+        $e = $this->extr->find($eid);
+        if ($e && ($e['statut'] ?? '') === 'en_attente_ia') {
+            session()->setFlashdata('error', 'L\'IA est momentanément indisponible : votre document est conservé. Réessayez plus tard ou saisissez le contrat à la main.');
+            session()->setFlashdata('ia_indispo', true);
+            session()->setFlashdata('doc_id', $docId);
+            session()->setFlashdata('ext_id', $eid);
+            return redirect()->to('ia');
+        }
         return redirect()->to('ia/valider/' . $eid);
     }
 
@@ -238,15 +246,24 @@ class Ia extends BaseController
         return redirect()->to('contrats/voir/' . $cid)->with('succes', "Contrat créé à partir de l'extraction ($nb clause(s) validée(s)).");
     }
 
-    public function rejeter(int $eid)
+    public function relancerPost()
     {
-        $e = $this->extr->find($eid);
-        if (! $e) {
-            throw PageNotFoundException::forPageNotFound('Extraction introuvable.');
+        $extId = (int) ($this->request->getPost('ext_id') ?? 0);
+        $docId = (int) ($this->request->getPost('doc_id') ?? 0);
+        if ($extId > 0) {
+            $e = $this->extr->find($extId);
+            if ($e) {
+                $docId = (int) ($e['document_id'] ?? $docId);
+            }
         }
-        $this->extr->maj($eid, ['statut' => 'rejetee']);
-        audit_log('rejet', 'extractions_ia', $eid, ['statut' => $this->extr->lire($e, 'statut')], ['statut' => 'rejetee']);
-        return redirect()->to('ia')->with('succes', 'Extraction rejetée.');
+        if ($docId < 1) {
+            return redirect()->to('/ia')->with('erreur', 'Document introuvable.');
+        }
+        $eid = $this->lancerExtraction($docId);
+        if ($eid === 0) {
+            return redirect()->to('/ia')->with('erreur', "Document confidentiel : aucun envoi à l'IA.");
+        }
+        return redirect()->to('/ia');
     }
 
     // ---------------------------------------------------------------- interne
@@ -282,11 +299,20 @@ class Ia extends BaseController
                 'statut'        => 'en_attente',
             ]);
         } catch (Throwable $ex) {
-            $eid = $this->extr->creer($base + ['statut' => 'erreur', 'reponse_json' => '{}', 'erreur' => mb_substr($ex->getMessage(), 0, 500)]);
+            $msg = $ex->getMessage();
+            if (stripos($msg, 'indisponible') !== false || stripos($msg, 'surcharg') !== false || stripos($msg, '503') !== false || stripos($msg, '429') !== false || stripos($msg, 'délai') !== false) {
+                $eid = $this->extr->creer($base + ['statut' => 'en_attente_ia', 'reponse_json' => json_encode(['erreur' => 'en_attente_ia'], JSON_UNESCAPED_UNICODE), 'erreur' => mb_substr($msg, 0, 500)]);
+                audit_log('extraction', 'extractions_ia', $eid, null, ['document_id' => $docId], 'ia');
+                session()->setFlashdata('error', 'L\'IA est momentanément indisponible : votre document est conservé. Réessayez plus tard ou saisissez le contrat à la main.');
+                session()->setFlashdata('ia_indispo', true);
+                session()->setFlashdata('doc_id', $docId);
+                session()->setFlashdata('ext_id', $eid);
+                return $eid; // keep int but redirect handled by caller? caller expects int; return int and handle
+            }
+            $eid = $this->extr->creer($base + ['statut' => 'erreur', 'reponse_json' => '{}', 'erreur' => mb_substr($msg, 0, 500)]);
+            audit_log('extraction', 'extractions_ia', $eid, null, ['document_id' => $docId], 'ia');
+            return $eid;
         }
-
-        audit_log('extraction', 'extractions_ia', $eid, null, ['document_id' => $docId], 'ia');
-        return $eid;
     }
 
     /** Échoue en mode "fermé" : si le drapeau n'est pas lisible, on n'envoie rien. */

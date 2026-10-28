@@ -38,7 +38,7 @@ class Alertes extends BaseController
             $this->alertes->where('alertes.destinataire_id', $uid);
         }
 
-        $lignes = $this->alertes->orderBy('alertes.id', 'DESC')->paginate(20);
+        $lignes = $this->alertes->orderBy('alertes.genere_par_ia', 'DESC')->orderBy('alertes.id', 'DESC')->paginate(20);
 
         return view('alertes/index', [
             'titre'    => 'Alertes',

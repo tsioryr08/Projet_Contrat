@@ -7,7 +7,7 @@ use CodeIgniter\Router\RouteCollection;
  */
 
 // Redirection vers le tableau de bord si connecté (géré par AuthFilter)
-$routes->get('/', 'Home::index');
+// $routes->get('/', 'Home::index');
 
 // =========================================================
 // BLOC OLIVIER : authentification et socle (O1)
@@ -86,6 +86,7 @@ $routes->group('litiges', ['filter' => 'role:admin,juriste,responsable,direction
 $routes->group('ia', ['filter' => 'role:admin,juriste,responsable'], function ($routes) {
     $routes->get('/', 'Ia::index');
     $routes->post('televerser', 'Ia::televerser');
+    $routes->post('relancer', 'Ia::relancerPost');
     $routes->post('relancer/(:num)', 'Ia::relancer/$1');
     $routes->get('valider/(:num)', 'Ia::valider/$1');
     $routes->post('creer-contrat/(:num)', 'Ia::creerContrat/$1');

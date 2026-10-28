@@ -11,8 +11,11 @@ class GenererAlertes extends BaseCommand
     protected $group       = 'Alertes';
     protected $name        = 'alertes:generer';
     protected $description = 'Génère et envoie les alertes J30 / J10 / J0 (contrats et obligations).';
-    protected $usage       = 'alertes:generer [--date=AAAA-MM-JJ]';
-    protected $options     = ['--date' => 'Simule une autre date du jour (tests).'];
+    protected $usage       = 'alertes:generer [--date=AAAA-MM-JJ] [--sans-ia]';
+    protected $options     = [
+        '--date'    => 'Simule une autre date du jour (tests).',
+        '--sans-ia' => 'Désactive la rédaction IA, utilise uniquement les textes modèles.',
+    ];
 
     public function run(array $params)
     {
@@ -22,7 +25,8 @@ class GenererAlertes extends BaseCommand
             return EXIT_USER_INPUT;
         }
 
-        $s = (new AlerteService())->generer($date ?: null);
+        $sansIa = (bool) CLI::getOption('sans-ia');
+        $s = (new AlerteService($sansIa))->generer($date ?: null);
 
         CLI::write('Alertes du ' . $s['date'], 'yellow');
         CLI::write('  Obligations passées en retard : ' . $s['retards']);

@@ -45,7 +45,17 @@ $stat = ['envoyee' => 'Non lue', 'lue' => 'Lue', 'traitee' => 'Traitée'];
                 <td><span class="badge <?= $grav[$a['gravite']] ?? 'bg-secondary' ?>"><?= esc($a['regle_code']) ?></span></td>
                 <td>
                     <?= esc($a['sujet']) ?>
-                    <?php if ((int) $a['obligation_id'] > 0): ?><span class="badge bg-light text-dark border">Obligation</span><?php endif; ?>
+                    <?php if ((int) $a['obligation_id'] > 0): ?>
+                        <span class="badge bg-light text-dark border">Obligation</span>
+                        <button type="button" class="btn btn-sm btn-outline-primary ms-1 btn-voir-alerte"
+                            data-sujet="<?= esc($a['sujet']) ?>"
+                            data-contrat="<?= esc($a['contrat_reference']) ?>"
+                            data-message="<?= esc($a['message']) ?>"
+                            data-regle="<?= esc($a['regle_code']) ?>">
+                            Voir alerte
+                        </button>
+                    <?php endif; ?>
+                    <?php if ((int) ($a['genere_par_ia'] ?? 0) === 1): ?><span class="badge bg-info text-dark">Rédigé par l'IA</span><?php endif; ?>
                 </td>
                 <td><a href="<?= base_url('contrats/voir/' . $a['contrat_id']) ?>"><?= esc($a['contrat_reference']) ?></a></td>
                 <?php if ($tous): ?><td><?= esc($a['destinataire_nom']) ?></td><?php endif; ?>
@@ -69,4 +79,47 @@ $stat = ['envoyee' => 'Non lue', 'lue' => 'Lue', 'traitee' => 'Traitée'];
     </table>
 </div>
 <?= $pager->links('default', 'bootstrap_full') ?>
+
+<div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasAlerte" aria-labelledby="offcanvasAlerteLabel">
+  <div class="offcanvas-header border-bottom">
+    <div>
+      <h5 class="offcanvas-title mb-0" id="offcanvasAlerteLabel">Alerte</h5>
+      <small class="text-muted" id="offcanvasAlerteSousTitre"></small>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fermer"></button>
+  </div>
+  <div class="offcanvas-body p-0">
+    <div class="list-group list-group-flush">
+      <div class="list-group-item py-3">
+        <div class="d-flex align-items-start">
+          <div class="flex-shrink-0">
+            <span class="rounded-circle d-inline-flex align-items-center justify-content-center bg-danger text-white" style="width:40px;height:40px;">
+              <i class="bi bi-exclamation-triangle"></i>
+            </span>
+          </div>
+          <div class="flex-grow-1 ms-3">
+            <div class="fw-semibold" id="offcanvasAlerteSujet"></div>
+            <div class="mt-2 text-break" style="white-space: pre-line;" id="offcanvasAlerteMessage"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  var el = document.getElementById('offcanvasAlerte');
+  if (!el) return;
+  var offcanvas = new bootstrap.Offcanvas(el);
+  document.querySelectorAll('.btn-voir-alerte').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.getElementById('offcanvasAlerteSujet').textContent = this.dataset.sujet || '';
+      document.getElementById('offcanvasAlerteSousTitre').textContent = 'Contrat ' + (this.dataset.contrat || '') + ' • ' + (this.dataset.regle || '');
+      document.getElementById('offcanvasAlerteMessage').textContent = this.dataset.message || '';
+      offcanvas.show();
+    });
+  });
+});
+</script>
 <?= $this->endSection() ?>

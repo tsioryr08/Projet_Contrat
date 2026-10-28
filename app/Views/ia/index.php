@@ -6,8 +6,19 @@
 <?php if ($simulation): ?>
     <div class="alert alert-warning">Mode <strong>simulation</strong> : un JSON fixe est renvoyé, aucun appel API (<code>ia.mode = reel</code> dans <code>.env</code> pour l'activer).</div>
 <?php endif; ?>
-<?php if (session()->getFlashdata('erreurs')): ?>
-    <div class="alert alert-danger"><?php foreach (session()->getFlashdata('erreurs') as $e): ?><div><?= esc($e) ?></div><?php endforeach; ?></div>
+<?php if (! empty($ia_indispo) || session()->getFlashdata('ia_indispo')): ?>
+    <div class="alert alert-warning d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">
+        <div><?= esc(session()->getFlashdata('error') ?: "L'IA est momentanément indisponible : votre document est conservé. Réessayez plus tard ou saisissez le contrat à la main.") ?></div>
+        <div class="d-flex gap-2">
+            <form method="post" action="<?= base_url('ia/relancer') ?>">
+                <?= csrf_field() ?>
+                <input type="hidden" name="ext_id" value="<?= esc($ext_id ?? session()->getFlashdata('ext_id') ?? '') ?>">
+                <input type="hidden" name="doc_id" value="<?= esc($doc_id ?? session()->getFlashdata('doc_id') ?? '') ?>">
+                <button class="btn btn-outline-dark btn-sm" type="submit">Réessayer</button>
+            </form>
+            <a class="btn btn-outline-primary btn-sm" href="<?= base_url('contrats/creer') ?>">Saisir manuellement</a>
+        </div>
+    </div>
 <?php endif; ?>
 
 <form action="<?= base_url('ia/televerser') ?>" method="post" enctype="multipart/form-data" class="card card-body mb-4">
