@@ -3,6 +3,13 @@
 <?= $this->section('content') ?>
 <h1 class="h3 mb-3">Extraction de clauses par IA</h1>
 
+<?php if ($message = session()->getFlashdata('succes')): ?>
+    <div class="alert alert-success"><?= esc($message) ?></div>
+<?php endif; ?>
+<?php if ($message = session()->getFlashdata('erreur')): ?>
+    <div class="alert alert-danger"><?= esc($message) ?></div>
+<?php endif; ?>
+
 <?php if ($simulation): ?>
     <div class="alert alert-warning">Mode <strong>simulation</strong> : un JSON fixe est renvoyé, aucun appel API (<code>ia.mode = reel</code> dans <code>.env</code> pour l'activer).</div>
 <?php endif; ?>
@@ -50,7 +57,13 @@
                 <td><?= $d['confidentiel'] ? '<span class="badge bg-dark">Oui</span>' : 'Non' ?></td>
                 <td>
                     <?php if ($d['statut']): ?>
-                        <span class="badge <?= ['en_attente' => 'bg-warning text-dark', 'validee' => 'bg-success', 'erreur' => 'bg-danger', 'rejetee' => 'bg-secondary'][$d['statut']] ?? 'bg-light text-dark' ?>"><?= esc($d['statut']) ?></span>
+                        <span class="badge <?= ['en_attente_ia' => 'bg-info text-dark', 'en_attente' => 'bg-warning text-dark', 'validee' => 'bg-success', 'erreur' => 'bg-danger', 'rejetee' => 'bg-secondary'][$d['statut']] ?? 'bg-light text-dark' ?>"><?= esc($d['statut'] === 'en_attente_ia' ? 'en attente de traitement' : $d['statut']) ?></span>
+                        <?php if ($d['statut'] === 'en_attente_ia' && $d['extraction_id']): ?>
+                            <span class="ia-progress d-inline-flex align-items-center gap-2 ms-2" data-progress-url="<?= esc(base_url('ia/progression/' . $d['extraction_id'])) ?>">
+                                <span class="ia-spinner" aria-hidden="true"></span>
+                                <span class="ia-progress-label">0 % — En attente</span>
+                            </span>
+                        <?php endif; ?>
                         <?php if ($d['erreur']): ?><small class="text-danger d-block"><?= esc($d['erreur']) ?></small><?php endif; ?>
                     <?php else: ?>—<?php endif; ?>
                 </td>
@@ -60,9 +73,9 @@
                     <?php elseif ($d['contrat_id']): ?>
                         <a class="btn btn-sm btn-outline-secondary" href="<?= base_url('contrats/voir/' . $d['contrat_id']) ?>">Contrat</a>
                     <?php endif; ?>
-                    <?php if (! $d['confidentiel'] && in_array($d['statut'], ['erreur', 'rejetee', null], true)): ?>
-                        <form action="<?= base_url('ia/relancer/' . $d['id']) ?>" method="post" class="d-inline"><?= csrf_field() ?>
-                            <button class="btn btn-sm btn-outline-warning" type="submit">Relancer</button></form>
+                    <?php if (! $d['confidentiel'] && in_array($d['statut'], ['en_attente_ia', 'erreur', 'rejetee', null], true)): ?>
+                        <form action="<?= base_url('ia/relancer/' . $d['id']) ?>" method="post" target="_self" class="d-inline"><?= csrf_field() ?>
+                            <button class="btn btn-sm btn-outline-warning" type="submit"><?= $d['statut'] === 'en_attente_ia' ? 'Traiter maintenant' : 'Relancer' ?></button></form>
                     <?php endif; ?>
                 </td>
             </tr>
@@ -70,4 +83,41 @@
         </tbody>
     </table>
 </div>
+<style>
+    .ia-spinner {
+        width: 18px;
+        height: 18px;
+        border: 3px solid #dbeafe;
+        border-top-color: #0d6efd;
+        border-radius: 50%;
+        animation: ia-spin .8s linear infinite;
+    }
+    .ia-progress.done .ia-spinner { border-color: #198754; animation: none; }
+    .ia-progress.error .ia-spinner { border-color: #dc3545; animation: none; }
+    @keyframes ia-spin { to { transform: rotate(360deg); } }
+</style>
+<script>
+(() => {
+    const items = [...document.querySelectorAll('.ia-progress')];
+    if (!items.length) return;
+    const update = async (item) => {
+        try {
+            const response = await fetch(item.dataset.progressUrl, {headers: {'Accept': 'application/json'}});
+            if (!response.ok) return;
+            const data = await response.json();
+            const percent = Math.max(0, Math.min(100, Number(data.pourcentage || 0)));
+            item.querySelector('.ia-progress-label').textContent = `${percent} % — ${data.etape || 'En cours'}`;
+            if (data.termine) {
+                item.classList.add(data.statut === 'erreur' ? 'error' : 'done');
+                if (data.statut !== 'erreur') item.querySelector('.ia-progress-label').textContent = '100 % — Terminé';
+                return;
+            }
+            window.setTimeout(() => update(item), 2000);
+        } catch (error) {
+            window.setTimeout(() => update(item), 5000);
+        }
+    };
+    items.forEach(update);
+})();
+</script>
 <?= $this->endSection() ?>

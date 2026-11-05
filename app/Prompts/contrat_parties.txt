@@ -1,0 +1,6 @@
+Tâche : extraire les parties et l'identité du contrat.
+Champs : fournisseur (nom légal du fournisseur), service (service interne du client), objet (objet contractuel), type (catégorie, par exemple Services / Maintenance), intitule (titre du contrat).
+Exemple : {"fournisseur":{"valeur":"Mahajanga Transport","extrait":"Mahajanga Transport"},"service":{"valeur":"Achats","extrait":"service Achats"},"objet":{"valeur":"Maintenance préventive et corrective des équipements.","extrait":"Maintenance préventive et corrective des équipements."},"type":{"valeur":"Services / Maintenance","extrait":"Services / Maintenance"},"intitule":{"valeur":"Contrat de maintenance","extrait":"CONTRAT MAINTENANCE"}}
+Texte fourni :
+{{texte}}
+Sortie JSON :

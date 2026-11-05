@@ -1,0 +1,35 @@
+Contract Extraction
+ [x] Regex extracts valid values with data set #0
+ [x] Regex extracts valid values with data set #1
+ [x] Regex extracts valid values with data set #2
+ [x] Regex extracts valid values with data set #3
+ [x] Regex extracts valid values with data set #4
+ [x] Regex extracts valid values with data set #5
+ [x] Regex extracts valid values with data set #6
+ [x] Regex extracts valid values with data set #7
+ [x] Regex extracts valid values with data set #8
+ [x] Regex extracts valid values with data set #9
+ [x] Regex rejects invalid identifiers with data set #0
+ [x] Regex rejects invalid identifiers with data set #1
+ [x] Regex rejects invalid identifiers with data set #2
+ [x] Regex rejects invalid identifiers with data set #3
+ [x] Regex rejects invalid identifiers with data set #4
+ [x] Regex rejects invalid identifiers with data set #5
+ [x] Regex rejects invalid identifiers with data set #6
+ [x] Regex rejects invalid identifiers with data set #7
+ [x] Regex rejects invalid identifiers with data set #8
+ [x] Regex rejects invalid identifiers with data set #9
+ [x] Citation and type are required for ok
+ [x] Regex wins and conflicts are kept
+
+Example Database
+ [x] Model find all
+ [x] Soft delete leaves row
+
+Example Session
+ [x] Session simple
+
+Health
+ [x] Is defined app path
+ [x] Base url has been set
+

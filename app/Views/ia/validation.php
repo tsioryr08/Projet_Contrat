@@ -9,9 +9,13 @@ $conf = function (string $k) use ($d) {
     return '<span class="badge ' . $cl . '">' . round($c * 100) . ' %</span>';
 };
 $v = fn($k, $def = '') => old($k, $d[$k] ?? $def);
+$champStatut = static fn(string $k): string => (($d['_champs'][$k]['statut'] ?? '') === 'a_verifier') ? '<span class="badge bg-warning text-dark">À vérifier</span>' : '';
 ?>
 <h1 class="h3 mb-1">Validation de l'extraction</h1>
 <p class="text-muted">Document : <?= esc($nomDocument) ?><?= $simulation ? ' (mode simulation)' : '' ?></p>
+<?php if (! empty($d['_erreurs']) || array_filter($d['_champs'] ?? [], static fn(array $champ): bool => ($champ['statut'] ?? '') === 'a_verifier')): ?>
+    <div class="alert alert-warning">Certains champs nécessitent une vérification humaine avant validation.</div>
+<?php endif; ?>
 
 <?php if (session()->getFlashdata('erreurs')): ?>
     <div class="alert alert-danger"><ul class="mb-0"><?php foreach (session()->getFlashdata('erreurs') as $x): ?><li><?= esc($x) ?></li><?php endforeach; ?></ul></div>
@@ -39,7 +43,7 @@ $v = fn($k, $def = '') => old($k, $d[$k] ?? $def);
         <div class="card-header">Contrat</div>
         <div class="card-body row g-3">
             <div class="col-md-8">
-                <label class="form-label">Intitulé * <?= $conf('intitule') ?></label>
+                <label class="form-label">Intitulé * <?= $conf('intitule') ?> <?= $champStatut('intitule') ?></label>
                 <input class="form-control" name="intitule" maxlength="200" value="<?= esc($v('intitule')) ?>" required>
             </div>
             <div class="col-md-4">
@@ -73,12 +77,12 @@ $v = fn($k, $def = '') => old($k, $d[$k] ?? $def);
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-3"><label class="form-label">Signature</label>
+            <div class="col-md-3">            <label class="form-label">Signature <?= $champStatut('date_signature') ?></label>
                 <input type="date" class="form-control" name="date_signature" value="<?= esc($v('date_signature')) ?>"></div>
             <div class="col-md-3"><label class="form-label">Début * <?= $conf('date_debut') ?></label>
-                <input type="date" class="form-control" name="date_debut" value="<?= esc($v('date_debut')) ?>" required></div>
+                <input type="date" class="form-control <?= $champStatut('date_debut') ? 'border-warning' : '' ?>" name="date_debut" value="<?= esc($v('date_debut')) ?>" required></div>
             <div class="col-md-3"><label class="form-label">Fin * <?= $conf('date_fin') ?></label>
-                <input type="date" class="form-control" name="date_fin" value="<?= esc($v('date_fin')) ?>" required></div>
+                <input type="date" class="form-control <?= $champStatut('date_fin') ? 'border-warning' : '' ?>" name="date_fin" value="<?= esc($v('date_fin')) ?>" required></div>
             <div class="col-md-3"><label class="form-label">Durée (mois)</label>
                 <input type="number" min="1" class="form-control" name="duree_mois" value="<?= esc($v('duree_mois')) ?>"></div>
             <div class="col-md-3"><label class="form-label">Préavis (jours) * <?= $conf('preavis_jours') ?></label>

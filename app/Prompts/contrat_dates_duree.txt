@@ -1,0 +1,6 @@
+Tâche : extraire les dates, la durée et le préavis.
+Champs : date_signature, date_debut, date_fin (AAAA-MM-JJ), duree_mois (entier), preavis_jours (entier).
+Exemple : {"date_signature":{"valeur":"2026-01-05","extrait":"signé le 05/01/2026"},"date_debut":{"valeur":null,"extrait":null},"date_fin":{"valeur":null,"extrait":null},"duree_mois":{"valeur":12,"extrait":"durée de douze mois"},"preavis_jours":{"valeur":null,"extrait":null}}
+Texte fourni :
+{{texte}}
+Sortie JSON :

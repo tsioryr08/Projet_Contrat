@@ -21,61 +21,53 @@ $art = 0;
     .confidentiel { color: #fff; background: #222; padding: 3px; }
     h2 { font-size: 12px; margin: 16px 0 4px 0; padding-bottom: 2px; border-bottom: 1px solid #888; }
     p { margin: 4px 0; text-align: justify; }
-    table.grille { width: 100%; border-collapse: collapse; margin: 4px 0; }
-    table.grille td, table.grille th { border: 1px solid #ccc; padding: 4px 6px; vertical-align: top; text-align: left; }
-    table.grille th { background: #f0f0f0; width: 32%; font-weight: bold; }
-    .partie { border: 1px solid #bbb; padding: 6px 8px; margin: 6px 0; }
-    .signatures { width: 100%; margin-top: 30px; border-collapse: collapse; }
-    .signatures td { width: 50%; height: 110px; vertical-align: top; border: 1px solid #bbb; padding: 6px; }
+    .partie { margin: 8px 0; }
+    .signature { display: inline-block; width: 47%; min-height: 110px; vertical-align: top; margin-top: 24px; }
     .clause { margin: 6px 0; padding-left: 8px; border-left: 3px solid #ccc; }
     .petit { color: #666; font-size: 9px; }
 </style>
 </head>
 <body>
 
-<h1>Contrat <?= esc($contrat['type_libelle']) ?></h1>
+<h1><?= esc($contrat['intitule'] ?: 'Contrat de ' . $contrat['type_libelle']) ?></h1>
 <div class="sous-titre">Référence <?= esc($contrat['reference']) ?> — <?= esc($contrat['intitule']) ?></div>
 <?php if ($projet): ?><div class="bandeau projet">PROJET — DOCUMENT NON SIGNÉ (statut : <?= esc($statuts[$contrat['statut']] ?? $contrat['statut']) ?>)</div><?php endif; ?>
 <?php if ($contrat['confidentiel']): ?><div class="bandeau confidentiel">CONFIDENTIEL</div><?php endif; ?>
 
 <h2>Entre les soussignés</h2>
-<div class="partie">
-    <strong>L'entreprise</strong>, représentée par son service <strong><?= esc($contrat['service_nom'] ?? 'non précisé') ?></strong>
-    <?php if (! empty($contrat['responsable_nom'])): ?>, responsable du suivi : <?= esc($contrat['responsable_nom']) ?><?php endif; ?>.
-    <br><em>Ci-après « le Client ».</em>
-</div>
-<p style="text-align:center">et</p>
-<div class="partie">
+<p class="partie">
+    L'entreprise, représentée par son service <strong><?= esc($contrat['service_nom'] ?? 'non précisé') ?></strong>
+    <?php if (! empty($contrat['responsable_nom'])): ?>, responsable du suivi : <?= esc($contrat['responsable_nom']) ?><?php endif; ?>,
+    ci-après désignée « le Client »,
+</p>
+<p style="text-align:center"><strong>D'UNE PART,</strong></p>
+<p class="partie">
     <strong><?= esc($contrat['raison_sociale']) ?></strong>
-    <?php if ($contrat['adresse'] || $contrat['ville']): ?>, <?= esc(trim(($contrat['adresse'] ?? '') . ' ' . ($contrat['ville'] ?? ''))) ?><?php endif; ?>
-    <?php if ($contrat['pays']): ?> (<?= esc($contrat['pays']) ?>)<?php endif; ?>.
-    <br>
+    <?php if ($contrat['adresse'] || $contrat['ville']): ?>, dont le siège est situé <?= esc(trim(($contrat['adresse'] ?? '') . ' ' . ($contrat['ville'] ?? ''))) ?><?php endif; ?>
+    <?php if ($contrat['pays']): ?> (<?= esc($contrat['pays']) ?>)<?php endif; ?>,
     <?php
     $ident = [];
     if ($contrat['nif']) $ident[] = 'NIF : ' . $contrat['nif'];
     if ($contrat['stat']) $ident[] = 'STAT : ' . $contrat['stat'];
     if ($contrat['rcs']) $ident[] = 'RCS : ' . $contrat['rcs'];
-    echo esc(implode(' — ', $ident));
-    ?>
-    <?php if ($contrat['representant_legal']): ?><br>Représentée par : <?= esc($contrat['representant_legal']) ?><?php endif; ?>
-    <br><em>Ci-après « le Fournisseur ».</em>
-</div>
+    ?>immatriculée sous <?= esc(implode(' — ', $ident) ?: 'un numéro non précisé') ?>,
+    <?php if ($contrat['representant_legal']): ?>représentée par <?= esc($contrat['representant_legal']) ?>,<?php endif; ?>
+    ci-après désignée « le Fournisseur ».
+</p>
+<p style="text-align:center"><strong>D'AUTRE PART.</strong></p>
+<p>Ensemble désignés « les Parties ».</p>
+
+<h2>Préambule</h2>
+<p>Le Client souhaite bénéficier des services décrits au présent contrat. Le Fournisseur, spécialisé dans le domaine concerné, a proposé ses services. Les Parties se sont rapprochées et ont convenu de ce qui suit.</p>
+<p style="text-align:center"><strong>IL A ÉTÉ CONVENU CE QUI SUIT :</strong></p>
 
 <h2>Article <?= ++$art ?> — Objet</h2>
-<p><?= nl2br(esc($contrat['objet'] ?: 'Objet non renseigné.')) ?></p>
-<table class="grille">
-    <tr><th>Type de contrat</th><td><?= esc($contrat['famille']) ?> / <?= esc($contrat['type_libelle']) ?></td></tr>
-    <tr><th>Date de signature</th><td><?= $d($contrat['date_signature']) ?></td></tr>
-</table>
+<p>Le présent contrat a pour objet de définir les conditions dans lesquelles le Fournisseur réalisera pour le Client la mission suivante : <?= nl2br(esc($contrat['objet'] ?: 'objet non renseigné')) ?>.</p>
+<p>Type de contrat : <strong><?= esc($contrat['famille']) ?> / <?= esc($contrat['type_libelle']) ?></strong>. Le contrat est signé le <strong><?= $d($contrat['date_signature']) ?></strong>.</p>
 
 <h2>Article <?= ++$art ?> — Durée et reconduction</h2>
-<table class="grille">
-    <tr><th>Date de début</th><td><?= $d($contrat['date_debut']) ?></td></tr>
-    <tr><th>Date de fin</th><td><?= $d($contrat['date_fin']) ?></td></tr>
-    <tr><th>Durée</th><td><?= $contrat['duree_mois'] ? (int) $contrat['duree_mois'] . ' mois' : '—' ?></td></tr>
-    <tr><th>Préavis</th><td><?= (int) $contrat['preavis_jours'] ?> jour(s)</td></tr>
-    <tr><th>Date limite de non-reconduction</th><td><?= $d($contrat['date_limite_non_reconduction']) ?></td></tr>
-</table>
+<p>Le contrat prend effet le <strong><?= $d($contrat['date_debut']) ?></strong> et prend fin le <strong><?= $d($contrat['date_fin']) ?></strong>. Sa durée est de <strong><?= $contrat['duree_mois'] ? (int) $contrat['duree_mois'] . ' mois' : 'durée non précisée' ?></strong>.</p>
+<p>Le préavis est fixé à <strong><?= (int) $contrat['preavis_jours'] ?> jour(s)</strong>. La date limite de non-reconduction est le <strong><?= $d($contrat['date_limite_non_reconduction']) ?></strong>.</p>
 <p>
 <?php if ($tacite): ?>
     Le contrat est <strong>reconduit tacitement</strong>
@@ -90,19 +82,13 @@ $art = 0;
 </p>
 
 <h2>Article <?= ++$art ?> — Prix et modalités de paiement</h2>
-<table class="grille">
-    <tr><th>Montant</th><td><?= $m($contrat['montant']) ?> <?= esc($contrat['devise']) ?></td></tr>
-    <tr><th>Périodicité de paiement</th><td><?= esc($contrat['periodicite_paiement'] ? ucfirst($contrat['periodicite_paiement']) : '—') ?></td></tr>
-    <tr><th>Indexation</th><td><?= esc($contrat['indexation'] ?: '—') ?></td></tr>
-    <tr><th>Garantie</th><td><?= nl2br(esc($contrat['garantie'] ?: '—')) ?></td></tr>
-</table>
+<p>Le prix de la mission est fixé à <strong><?= $m($contrat['montant']) ?> <?= esc($contrat['devise']) ?></strong>.</p>
+<p>Le paiement s'effectue selon la périodicité suivante : <strong><?= esc($contrat['periodicite_paiement'] ? ucfirst($contrat['periodicite_paiement']) : 'non précisée') ?></strong>. L'indexation est <?= esc($contrat['indexation'] ?: 'non précisée') ?>.</p>
+<p>Garantie : <?= nl2br(esc($contrat['garantie'] ?: 'aucune garantie précisée')) ?>.</p>
 
 <h2>Article <?= ++$art ?> — Pénalités</h2>
 <p><?= nl2br(esc($contrat['penalite_description'] ?: 'Aucune pénalité stipulée.')) ?></p>
-<table class="grille">
-    <tr><th>Taux de pénalité</th><td><?= $contrat['penalite_taux'] !== null ? esc($contrat['penalite_taux']) . ' %' : '—' ?></td></tr>
-    <tr><th>Plafond</th><td><?= $contrat['penalite_plafond'] !== null ? $m($contrat['penalite_plafond']) . ' ' . esc($contrat['devise']) : '—' ?></td></tr>
-</table>
+<p>Taux de pénalité : <strong><?= $contrat['penalite_taux'] !== null ? esc($contrat['penalite_taux']) . ' %' : 'non précisé' ?></strong>. Plafond : <strong><?= $contrat['penalite_plafond'] !== null ? $m($contrat['penalite_plafond']) . ' ' . esc($contrat['devise']) : 'non précisé' ?></strong>.</p>
 
 <h2>Article <?= ++$art ?> — Résiliation</h2>
 <p><?= nl2br(esc($contrat['clause_resiliation'] ?: 'Aucune clause de résiliation spécifique.')) ?></p>
@@ -123,12 +109,8 @@ $art = 0;
    Tout litige relève de la juridiction suivante : <strong><?= esc($contrat['juridiction'] ?: 'non précisée') ?></strong>.</p>
 
 <p style="margin-top:14px">Fait à ______________________, le ____ / ____ / ________, en deux exemplaires originaux.</p>
-<table class="signatures">
-    <tr>
-        <td><strong>Pour le Client</strong><br><span class="petit">Nom, qualité, signature et cachet</span></td>
-        <td><strong>Pour le Fournisseur</strong><br><span class="petit">Nom, qualité, signature et cachet</span></td>
-    </tr>
-</table>
+<div class="signature"><strong>Pour le Client :</strong><br><br>Nom : ______________________<br><br>Signature précédée de la mention « Lu et approuvé » :</div>
+<div class="signature"><strong>Pour le Fournisseur :</strong><br><br>Nom : <?= esc($contrat['representant_legal'] ?: '______________________') ?><br><br>Signature précédée de la mention « Lu et approuvé » :</div>
 
 </body>
 </html>

@@ -6,7 +6,8 @@ use App\Models\ClauseModel;
 use App\Models\DocumentModel;
 use App\Models\ExtractionIaModel;
 use App\Services\ContratService;
-use App\Services\ExtractionTexteService;
+use App\Services\ContratChunker;
+use App\Services\ExtractionContratTexteService;
 use App\Services\IaService;
 use CodeIgniter\Exceptions\PageNotFoundException;
 use RuntimeException;
@@ -91,8 +92,11 @@ class Ia extends BaseController
                 "Document enregistré. Contrat confidentiel : aucun texte n'est envoyé à l'IA, saisissez le contrat manuellement.");
         }
 
-        $eid = $this->lancerExtraction($docId);
-        return redirect()->to('ia/valider/' . $eid);
+        $eid = $this->mettreEnFile($docId);
+        if ($eid > 0) {
+            $this->demarrerWorker($eid);
+        }
+        return redirect()->to('ia')->with('succes', 'Contrat importé. Extraction IA lancée en arrière-plan.');
     }
 
     public function relancer(int $docId)
@@ -100,19 +104,12 @@ class Ia extends BaseController
         if (! $this->docs->find($docId)) {
             throw PageNotFoundException::forPageNotFound('Document introuvable.');
         }
-        $eid = $this->lancerExtraction($docId);
+        $eid = $this->mettreEnFile($docId);
         if ($eid === 0) {
             return redirect()->to('ia')->with('erreur', "Document confidentiel : aucun envoi à l'IA.");
         }
-        $e = $this->extr->find($eid);
-        if ($e && ($e['statut'] ?? '') === 'en_attente_ia') {
-            session()->setFlashdata('error', 'L\'IA est momentanément indisponible : votre document est conservé. Réessayez plus tard ou saisissez le contrat à la main.');
-            session()->setFlashdata('ia_indispo', true);
-            session()->setFlashdata('doc_id', $docId);
-            session()->setFlashdata('ext_id', $eid);
-            return redirect()->to('ia');
-        }
-        return redirect()->to('ia/valider/' . $eid);
+        $this->demarrerWorker($eid);
+        return redirect()->to('ia')->with('succes', 'Traitement lancé en arrière-plan. Vous pouvez continuer à utiliser l’application.');
     }
 
     public function valider(int $eid)
@@ -121,6 +118,7 @@ class Ia extends BaseController
         if (! $e) {
             throw PageNotFoundException::forPageNotFound('Extraction introuvable.');
         }
+
         $statut = $this->extr->lire($e, 'statut');
         $docId  = (int) $this->extr->lire($e, 'document_id');
         $doc    = $docId ? $this->docs->find($docId) : null;
@@ -145,6 +143,35 @@ class Ia extends BaseController
             'typesClause'  => ClauseModel::TYPES,
             'simulation'   => $this->ia->simulation(),
         ]);
+    }
+
+    public function progression(int $eid)
+    {
+        $extraction = $this->extr->find($eid);
+        if (! $extraction) {
+            return $this->response->setStatusCode(404)->setJSON(['erreur' => 'Extraction introuvable.']);
+        }
+
+        $progression = [
+            'pourcentage' => 0,
+            'etape' => 'En attente',
+            'termine' => false,
+            'statut' => (string) $this->extr->lire($extraction, 'statut'),
+        ];
+        $json = json_decode((string) $this->extr->lire($extraction, 'reponse_json', ''), true);
+        if (is_array($json) && is_array($json['_progression'] ?? null)) {
+            $progression = array_merge($progression, $json['_progression']);
+        }
+        if (in_array($progression['statut'], ['en_attente', 'validee', 'partielle'], true)) {
+            $progression['pourcentage'] = 100;
+            $progression['etape'] = 'Terminé';
+            $progression['termine'] = true;
+        } elseif ($progression['statut'] === 'erreur') {
+            $progression['etape'] = 'Erreur';
+            $progression['termine'] = true;
+        }
+
+        return $this->response->setJSON($progression);
     }
 
     public function creerContrat(int $eid)
@@ -246,6 +273,27 @@ class Ia extends BaseController
         return redirect()->to('contrats/voir/' . $cid)->with('succes', "Contrat créé à partir de l'extraction ($nb clause(s) validée(s)).");
     }
 
+    public function rejeter(int $eid)
+    {
+        $extraction = $this->extr->find($eid);
+        if (! $extraction) {
+            throw PageNotFoundException::forPageNotFound('Extraction introuvable.');
+        }
+
+        $statut = (string) $this->extr->lire($extraction, 'statut');
+        if ($statut !== 'en_attente') {
+            return redirect()->to('ia')->with('erreur', "Cette extraction n'est plus disponible pour rejet.");
+        }
+
+        $this->extr->maj($eid, [
+            'statut' => 'rejetee',
+            'erreur' => 'Extraction rejetée par l’utilisateur.',
+        ]);
+        audit_log('rejet', 'extractions_ia', $eid, ['statut' => $statut], ['statut' => 'rejetee']);
+
+        return redirect()->to('ia')->with('succes', 'Extraction rejetée. Aucun contrat n’a été créé.');
+    }
+
     public function relancerPost()
     {
         $extId = (int) ($this->request->getPost('ext_id') ?? 0);
@@ -259,20 +307,32 @@ class Ia extends BaseController
         if ($docId < 1) {
             return redirect()->to('/ia')->with('erreur', 'Document introuvable.');
         }
-        $eid = $this->lancerExtraction($docId);
+        $eid = $this->mettreEnFile($docId);
         if ($eid === 0) {
             return redirect()->to('/ia')->with('erreur', "Document confidentiel : aucun envoi à l'IA.");
         }
-        return redirect()->to('/ia');
+        $this->demarrerWorker($eid);
+        return redirect()->to('/ia')->with('succes', 'Traitement lancé en arrière-plan.');
     }
 
     // ---------------------------------------------------------------- interne
-    private function lancerExtraction(int $docId): int
+    private function mettreEnFile(int $docId): int
     {
         $doc = $this->docs->find($docId);
+        if (! $doc) {
+            return 0;
+        }
         if ($this->estConfidentiel($doc)) {
             log_message('info', "IA : aucun appel API pour le document #{$docId} (confidentiel).");
             return 0;
+        }
+
+        $existante = $this->extr->where('document_id', $docId)
+            ->where('statut', 'en_attente_ia')
+            ->orderBy('id', 'DESC')
+            ->first();
+        if ($existante) {
+            return (int) $existante['id'];
         }
 
         $base = [
@@ -282,35 +342,74 @@ class Ia extends BaseController
             'version_prompt' => IaService::VERSION_PROMPT,
             'created_by'     => (int) session()->get('utilisateur_id'),
         ];
+        $eid = $this->extr->creer($base + [
+            'reponse_json' => json_encode(['statut' => 'en_attente_ia'], JSON_UNESCAPED_UNICODE),
+            'statut' => 'en_attente_ia',
+        ]);
+        log_message('info', "IA : extraction mise en file pour le document #{$docId} (extraction #{$eid}).");
+        return $eid;
+    }
+
+    private function demarrerWorker(int $eid): void
+    {
+        $commande = [PHP_BINARY, ROOTPATH . 'spark', 'ia:reprendre', '--id', (string) $eid];
+        $descripteurs = [
+            0 => ['file', '/dev/null', 'r'],
+            1 => ['file', WRITEPATH . 'logs/ia-worker.log', 'ab'],
+            2 => ['file', WRITEPATH . 'logs/ia-worker.log', 'ab'],
+        ];
+        $processus = proc_open($commande, $descripteurs, $pipes, ROOTPATH);
+        if (is_resource($processus)) {
+            log_message('info', "IA : worker démarré depuis l'interface pour l'extraction #{$eid}.");
+        } else {
+            log_message('error', "IA : impossible de démarrer le worker pour l'extraction #{$eid}.");
+        }
+    }
+
+    private function traiterExtraction(int $docId): int
+    {
+        $doc = $this->docs->find($docId);
+        if (! $doc || $this->estConfidentiel($doc)) {
+            return 0;
+        }
+
+        $base = [
+            'document_id' => $docId,
+            'contrat_id' => $this->docs->lire($doc, 'contrat_id'),
+            'modele' => $this->ia->modele(),
+            'version_prompt' => IaService::VERSION_PROMPT,
+            'created_by' => (int) session()->get('utilisateur_id'),
+        ];
 
         try {
             $chemin = (string) $this->docs->lire($doc, 'chemin');
-            $texte  = (new ExtractionTexteService())->extraire(WRITEPATH . $chemin, pathinfo($chemin, PATHINFO_EXTENSION));
-            if (mb_strlen($texte) < 50) {
-                throw new RuntimeException('Aucun texte exploitable (PDF scanné ?). Saisie manuelle nécessaire.');
+            $pages = (new ExtractionContratTexteService())->pages(
+                WRITEPATH . $chemin,
+                pathinfo($chemin, PATHINFO_EXTENSION)
+            );
+            $chunks = (new ContratChunker())->decouper($pages);
+            if ($chunks === []) {
+                throw new RuntimeException('Aucun texte exploitable. Saisie manuelle nécessaire.');
             }
-            log_message('info', "IA : appel API (modèle {$this->ia->modele()}) pour le document #{$docId}.");
-            $r = $this->ia->extraire($texte);
-            $eid = $this->extr->creer($base + [
-                'reponse_json'  => $r['brut'],
-                'tokens_entree' => $r['tokens_entree'],
-                'tokens_sortie' => $r['tokens_sortie'],
-                'duree_ms'      => $r['duree_ms'],
-                'statut'        => 'en_attente',
+            $resultat = $this->ia->extraireChunks(
+                $chunks,
+                (string) $this->docs->lire($doc, 'hash_sha256'),
+                (bool) $this->docs->lire($doc, 'confidentiel', 0)
+            );
+            $this->extr->maj((int) ($this->extr->where('document_id', $docId)->where('statut', 'en_attente_ia')->orderBy('id', 'DESC')->first()['id'] ?? 0), [
+                'reponse_json' => $resultat['brut'],
+                'tokens_entree' => $resultat['tokens_entree'],
+                'tokens_sortie' => $resultat['tokens_sortie'],
+                'duree_ms' => $resultat['duree_ms'],
+                'statut' => 'en_attente',
+                'erreur' => null,
             ]);
-        } catch (Throwable $ex) {
-            $msg = $ex->getMessage();
-            if (stripos($msg, 'indisponible') !== false || stripos($msg, 'surcharg') !== false || stripos($msg, '503') !== false || stripos($msg, '429') !== false || stripos($msg, 'délai') !== false) {
-                $eid = $this->extr->creer($base + ['statut' => 'en_attente_ia', 'reponse_json' => json_encode(['erreur' => 'en_attente_ia'], JSON_UNESCAPED_UNICODE), 'erreur' => mb_substr($msg, 0, 500)]);
-                audit_log('extraction', 'extractions_ia', $eid, null, ['document_id' => $docId], 'ia');
-                session()->setFlashdata('error', 'L\'IA est momentanément indisponible : votre document est conservé. Réessayez plus tard ou saisissez le contrat à la main.');
-                session()->setFlashdata('ia_indispo', true);
-                session()->setFlashdata('doc_id', $docId);
-                session()->setFlashdata('ext_id', $eid);
-                return $eid; // keep int but redirect handled by caller? caller expects int; return int and handle
+            return (int) ($this->extr->where('document_id', $docId)->orderBy('id', 'DESC')->first()['id'] ?? 0);
+        } catch (Throwable $exception) {
+            $eid = (int) ($this->extr->where('document_id', $docId)->where('statut', 'en_attente_ia')->orderBy('id', 'DESC')->first()['id'] ?? 0);
+            if ($eid > 0) {
+                $this->extr->maj($eid, ['statut' => 'erreur', 'erreur' => mb_substr($exception->getMessage(), 0, 500)]);
             }
-            $eid = $this->extr->creer($base + ['statut' => 'erreur', 'reponse_json' => '{}', 'erreur' => mb_substr($msg, 0, 500)]);
-            audit_log('extraction', 'extractions_ia', $eid, null, ['document_id' => $docId], 'ia');
             return $eid;
         }
     }

@@ -1,0 +1,13 @@
+Tâche : extraire les champs disponibles dans le texte fourni.
+Champs : {{champs}}.
+Pour chaque champ, renvoie exactement {"valeur": ..., "extrait": "..."}.
+Si le champ est absent, utilise null pour valeur et extrait.
+L'extrait doit être une citation exacte copiée dans le texte. Ne devine jamais.
+Les dates doivent être au format AAAA-MM-JJ, les montants numériques et les durées entières.
+Pour clauses, utilise une liste d'objets avec type_clause, texte et page.
+Exemple : {"date_debut":{"valeur":null,"extrait":null},"duree_mois":{"valeur":12,"extrait":"Durée 12 mois"}}
+
+Texte fourni :
+{{texte}}
+
+Sortie JSON :

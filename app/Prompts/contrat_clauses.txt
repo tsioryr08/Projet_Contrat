@@ -1,0 +1,7 @@
+Tâche : extraire les clauses juridiques importantes.
+Champs : reconduction_tacite (booléen), clauses (liste de clauses avec type_clause, texte, page).
+Types autorisés : reconduction, preavis, resiliation, penalite, paiement, confidentialite, propriete_intellectuelle, responsabilite, force_majeure, juridiction, autre.
+Exemple : {"reconduction_tacite":{"valeur":true,"extrait":"reconduit tacitement"},"clauses":{"valeur":[{"type_clause":"preavis","texte":"Préavis de 60 jours avant le terme par lettre recommandée.","page":2}],"extrait":"Préavis de 60 jours avant le terme par lettre recommandée."}}
+Texte fourni :
+{{texte}}
+Sortie JSON :

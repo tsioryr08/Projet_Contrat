@@ -1,21 +1,41 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use RuntimeException;
 use Throwable;
 
-class IaService
+final class IaService
 {
-    public const VERSION_PROMPT = 'v1';
+    public const VERSION_PROMPT = 'ollama-qwen-v3';
 
-    private const MSG_INDISPONIBLE = 'L’IA est momentanément indisponible : votre document est conservé. Réessayez plus tard ou saisissez le contrat à la main.';
-
-    /** Codes HTTP pour lesquels un autre essai ou un autre modèle a des chances de réussir. */
-    private const CODES_SURCHARGE = [429, 500, 502, 503, 504];
-    private const CODE_RESEAU     = 599;
+    private const CODE_RESEAU = 599;
+    private const GROUPES = [
+        'parties' => ['fournisseur', 'service', 'objet', 'type', 'intitule'],
+        'dates_duree' => ['date_signature', 'date_debut', 'date_fin', 'duree_mois', 'preavis_jours'],
+        'finances' => ['montant', 'devise', 'penalites', 'modalites_paiement'],
+        'clauses' => ['reconduction_tacite', 'clauses'],
+    ];
+    private const MOTS_CLES = [
+        'parties' => ['fournisseur', 'prestataire', 'partie', 'objet', 'service'],
+        'dates_duree' => ['date', 'durée', 'duree', 'terme', 'préavis', 'effet', 'échéance'],
+        'finances' => ['montant', 'prix', '€', 'eur', 'paiement', 'facture', 'pénalité'],
+        'clauses' => ['reconduction', 'résiliation', 'confidentialité', 'responsabilité', 'juridiction', 'pénalité'],
+    ];
 
     private string $dernierModele = '';
+    private ContratExtractionVerifier $verifier;
+    private ContratExtractionMerger $merger;
+
+    public function __construct(
+        ?ContratExtractionVerifier $verifier = null,
+        ?ContratExtractionMerger $merger = null,
+    ) {
+        $this->verifier = $verifier ?? new ContratExtractionVerifier();
+        $this->merger = $merger ?? new ContratExtractionMerger();
+    }
 
     public function simulation(): bool
     {
@@ -24,322 +44,379 @@ class IaService
 
     public function fournisseur(): string
     {
-        return strtolower((string) env('ia.fournisseur', 'gemini')) === 'anthropic' ? 'anthropic' : 'gemini';
+        return 'ollama';
     }
 
-    /** Modèle réellement utilisé lors du dernier appel réussi, sinon le modèle principal. */
     public function modele(): string
     {
         return $this->dernierModele !== '' ? $this->dernierModele : $this->modelePrincipal();
     }
 
-    private function modelePrincipal(): string
-    {
-        $liste = $this->lireListe((string) env('ia.modeles', ''));
-
-        return $liste[0] ?? (string) env('ia.model', 'gemini-3.8-flash');
-    }
-
-    /** Modèles à essayer, dans l'ordre : ia.modeles, sinon ia.model puis ia.modelSecours. */
     public function listeModeles(): array
     {
-        $liste = $this->lireListe((string) env('ia.modeles', ''));
-        if ($liste !== []) {
-            return $liste;
-        }
-        $liste   = [(string) env('ia.model', 'gemini-3.8-flash')];
-        $secours = trim((string) env('ia.modelSecours', ''));
-        if ($secours !== '' && $secours !== $liste[0]) {
-            $liste[] = $secours;
-        }
-
-        return $liste;
+        return [$this->modelePrincipal()];
     }
 
-    private function lireListe(string $valeur): array
+    private function modelePrincipal(): string
     {
-        $liste = array_map('trim', explode(',', $valeur));
-
-        return array_values(array_unique(array_filter($liste, static fn ($v) => $v !== '')));
+        return trim((string) env('ia.model', 'qwen2.5:3b')) ?: 'qwen2.5:3b';
     }
 
-    /** @return array{json: array, brut: string, tokens_entree: int, tokens_sortie: int, duree_ms: int} */
+    /** Compatibilité avec les commandes historiques qui fournissent un texte. */
     public function extraire(string $texte): array
     {
-        @set_time_limit(180);
-        $t0 = microtime(true);
+        $chunk = new ContratChunk($texte, null, null, 0);
+        return $this->extraireChunks([$chunk], hash('sha256', $texte));
+    }
 
+    /**
+     * @param list<ContratChunk> $chunks
+     * @return array{json:array,brut:string,tokens_entree:int,tokens_sortie:int,duree_ms:int}
+     */
+    public function extraireChunks(array $chunks, string $hash, bool $confidentiel = false): array
+    {
+        $debut = microtime(true);
         if ($this->simulation()) {
-            return $this->resultat($this->jsonSimule(), 0, 0, $t0);
+            return $this->resultat($this->jsonSimule(), 0, 0, $debut);
         }
-
-        $cle = (string) env('ia.apiKey', '');
-        if ($cle === '') {
-            throw new RuntimeException('Clé API absente (.env : ia.apiKey).');
-        }
-
-        // Un texte déjà extrait n'est jamais renvoyé à l'API.
-        $hash   = hash('sha256', $texte);
-        $cache  = $this->depuisCache($hash, $t0);
+        $cache = $this->depuisCache($hash, $debut);
         if ($cache !== null) {
             return $cache;
         }
 
-        $modeles        = $this->listeModeles();
-        $budget         = max(10, (int) env('ia.budget', 70));   // secondes, tous modèles confondus
-        $debut          = microtime(true);
-        $essaisParModele = count($modeles) === 1 ? 3 : 1;        // plusieurs modèles : le suivant sert de nouvel essai
-        $surcharge      = false;
-        $derniereErreur = null;
-
-        foreach ($modeles as $modele) {
-            for ($essai = 1; $essai <= $essaisParModele; $essai++) {
-                $restant = $budget - (microtime(true) - $debut);
-                if ($restant < 5) {
-                    break 2;
-                }
+        $texteSource = (new ContratChunker())->texte($chunks);
+        $regex = (new ContratRegexExtractor())->extraire($texteSource);
+        $llm = [];
+        $tokensEntree = 0;
+        $tokensSortie = 0;
+        $erreurs = [];
+        $champsLlm = array_values(array_filter(
+            array_unique(array_merge(...array_values(self::GROUPES))),
+            static fn (string $champ): bool => ! isset($regex[$champ])
+        ));
+        if ($champsLlm !== []) {
+            $motsCles = array_values(array_unique(array_merge(...array_values(self::MOTS_CLES))));
+            $selection = $this->selectionner($chunks, $motsCles);
+            if ($selection !== []) {
                 try {
-                    [$txt, $in, $out] = $this->fournisseur() === 'gemini'
-                        ? $this->appelGemini($cle, $texte, $modele, $restant)
-                        : $this->appelAnthropic($cle, $texte, $modele, $restant);
-
-                    $json = $this->decoderJson($txt);
-                    $json['_cache_hash'] = $hash;
-                    $this->dernierModele = $modele;
-
-                    return $this->resultat($json, $in, $out, $t0);
-                } catch (RuntimeException $e) {
-                    $derniereErreur = $e;
-                    log_message('warning', '[IA] modèle ' . $modele . ', essai ' . $essai . ' : ' . $e->getMessage());
-
-                    $code = $e->getCode();
-                    if (in_array($code, self::CODES_SURCHARGE, true)) {
-                        $surcharge = true;
-                    }
-                    $reessayable = in_array($code, self::CODES_SURCHARGE, true) || $code === self::CODE_RESEAU;
-                    if (! $reessayable) {
-                        break;   // erreur propre à ce modèle (404, JSON invalide...) : modèle suivant
-                    }
-                    if ($essai < $essaisParModele) {
-                        sleep($essai === 1 ? 2 : 5);
-                    }
+                    [$valeurs, $entree, $sortie] = $this->extraireGroupe('global', $champsLlm, $selection, $confidentiel, false);
+                    $llm = $valeurs;
+                    $tokensEntree = $entree;
+                    $tokensSortie = $sortie;
+                } catch (RuntimeException $exception) {
+                    $erreurs['global'] = $exception->getMessage();
                 }
             }
         }
-
-        if ($surcharge) {
-            throw new RuntimeException(self::MSG_INDISPONIBLE);
-        }
-
-        throw $derniereErreur ?? new RuntimeException(self::MSG_INDISPONIBLE);
+        $champsFinaux = $this->merger->fusionner($regex, $llm);
+        $json = $this->formatCompatible($champsFinaux, $chunks, $erreurs);
+        $json['_cache_hash'] = $hash;
+        $json['_pipeline'] = self::VERSION_PROMPT;
+        return $this->resultat($json, $tokensEntree, $tokensSortie, $debut);
     }
 
-    // ------------------------------------------------------------ Appels
-    /** @return array{0:string,1:int,2:int} */
-    private function appelGemini(string $cle, string $texte, string $modele, float $restant): array
+    /** @param list<ContratChunk> $chunks @return list<ContratChunk> */
+    private function selectionner(array $chunks, array $mots): array
     {
-        $config = [
-            'responseMimeType' => 'application/json',
-            'temperature'      => 0.1,
-            'maxOutputTokens'  => 16000,
-        ];
-        if (str_starts_with($modele, 'gemini-2.5')) {
-            $config['maxOutputTokens'] = 8000;
-            $config['thinkingConfig']  = ['thinkingBudget' => 0];
-        }
-
-        $corps = $this->post(
-            'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($modele) . ':generateContent',
-            ['Content-Type' => 'application/json', 'x-goog-api-key' => $cle],
-            [
-                'systemInstruction' => ['parts' => [['text' => $this->systeme()]]],
-                'contents'          => [['role' => 'user', 'parts' => [['text' => "Contrat :\n\n" . $texte]]]],
-                'generationConfig'  => $config,
-            ],
-            $restant
-        );
-
-        $txt = '';
-        foreach ($corps['candidates'][0]['content']['parts'] ?? [] as $p) {
-            if (! empty($p['thought'])) {
-                continue;   // partie « réflexion » du modèle : ignorée
+        $notes = [];
+        foreach ($chunks as $chunk) {
+            $score = 0;
+            foreach ($mots as $mot) {
+                $score += substr_count(mb_strtolower($chunk->texte), mb_strtolower($mot));
             }
-            $txt .= $p['text'] ?? '';
-        }
-        if ($txt === '') {
-            $raison = $corps['promptFeedback']['blockReason'] ?? ($corps['candidates'][0]['finishReason'] ?? 'réponse vide');
-            throw new RuntimeException('Gemini n’a renvoyé aucun texte (' . $raison . ').');
-        }
-
-        return [
-            $txt,
-            (int) ($corps['usageMetadata']['promptTokenCount'] ?? 0),
-            (int) ($corps['usageMetadata']['candidatesTokenCount'] ?? 0),
-        ];
-    }
-
-    /** @return array{0:string,1:int,2:int} */
-    private function appelAnthropic(string $cle, string $texte, string $modele, float $restant): array
-    {
-        $corps = $this->post(
-            'https://api.anthropic.com/v1/messages',
-            ['x-api-key' => $cle, 'anthropic-version' => '2023-06-01', 'Content-Type' => 'application/json'],
-            [
-                'model'      => $modele,
-                'max_tokens' => 4000,
-                'system'     => $this->systeme(),
-                'messages'   => [['role' => 'user', 'content' => "Contrat :\n\n" . $texte]],
-            ],
-            $restant
-        );
-
-        $txt = '';
-        foreach ($corps['content'] ?? [] as $bloc) {
-            if (($bloc['type'] ?? '') === 'text') {
-                $txt .= $bloc['text'];
+            if ($score > 0) {
+                $notes[] = [$score, $chunk];
             }
         }
-
-        return [$txt, (int) ($corps['usage']['input_tokens'] ?? 0), (int) ($corps['usage']['output_tokens'] ?? 0)];
+        usort($notes, static fn (array $a, array $b): int => $b[0] <=> $a[0]);
+        $selection = [];
+        $longueur = 0;
+        foreach ($notes as [, $chunk]) {
+            if ($selection !== [] && $longueur + $chunk->longueur() > 2000) {
+                continue;
+            }
+            $selection[] = $chunk;
+            $longueur += $chunk->longueur();
+        }
+        return $selection;
     }
 
-    // ------------------------------------------------------------ Commun
-    /**
-     * Un seul essai. En cas d'échec, l'exception porte le code HTTP
-     * (ou 599 pour un problème réseau, certificat ou délai).
-     */
-    private function post(string $url, array $headers, array $json, float $restant): array
+    /** @return array{0:array<string,array<string,mixed>>,1:int,2:int} */
+    private function extraireGroupe(string $groupe, array $champs, array $chunks, bool $confidentiel, bool $retry = true): array
     {
-        $verifier = filter_var(env('ia.sslVerify', 'true'), FILTER_VALIDATE_BOOLEAN);
-        $delai    = (int) max(5, min($restant, (float) env('ia.timeout', 45)));
+        $source = implode("\n\n", array_map(
+            static fn (ContratChunk $chunk): string => "[page {$chunk->page}, article {$chunk->article}]\n{$chunk->texte}",
+            $chunks
+        ));
+        $template = (string) file_get_contents(APPPATH . 'Prompts/contrat_' . $groupe . '.txt');
+        if ($groupe === 'global') {
+            $template = str_replace('{{champs}}', implode(', ', $champs), $template);
+        }
+        $prompt = str_replace('{{texte}}', $source, $template);
+        $erreur = null;
+        for ($tentative = 1; $tentative <= ($retry ? 2 : 1); $tentative++) {
+            try {
+                [$brut, $entree, $sortie] = $this->appelOllama($prompt, $champs, $groupe, $confidentiel, $tentative);
+                $decoded = $this->decoderJson($brut);
+                $resultat = [];
+                foreach ($champs as $champ) {
+                    $valeur = $decoded[$champ] ?? ['valeur' => null, 'extrait' => null];
+                    if (! is_array($valeur) || ! array_key_exists('valeur', $valeur) || ! array_key_exists('extrait', $valeur)) {
+                        throw new RuntimeException("Groupe {$groupe}: champ {$champ} absent ou mal formé.");
+                    }
+                    $resultat[$champ] = $this->verifier->verifier($champ, [
+                        'valeur' => $valeur['valeur'],
+                        'extrait' => $valeur['extrait'],
+                        'source' => 'llm',
+                        'page' => $this->pageExtrait($valeur['extrait'], $chunks),
+                        'candidats' => [['valeur' => $valeur['valeur'], 'source' => 'llm']],
+                    ], $source);
+                }
+                $erreur = null;
+                return [$resultat, $entree, $sortie];
+            } catch (RuntimeException $exception) {
+                $erreur = $exception;
+                // A network timeout cannot be corrected by changing the JSON prompt.
+                if ($tentative === 1 && $exception->getCode() !== self::CODE_RESEAU) {
+                    $prompt .= "\nErreur à corriger : " . $exception->getMessage() . ". Réponds uniquement au JSON demandé.";
+                } elseif ($exception->getCode() === self::CODE_RESEAU) {
+                    break;
+                }
+            }
+        }
+        if ($erreur instanceof RuntimeException) {
+            throw $erreur;
+        }
+        throw new RuntimeException("Groupe {$groupe}: extraction impossible.");
+    }
 
+    /** @return array{0:string,1:int,2:int} */
+    private function appelOllama(string $prompt, array $champs, string $groupe, bool $confidentiel, int $tentative): array
+    {
+        $debut = microtime(true);
+        $payload = json_encode([
+            'model' => $this->modelePrincipal(),
+            'stream' => false,
+            'keep_alive' => '30m',
+            'system' => $this->promptSysteme(),
+            'messages' => [['role' => 'user', 'content' => $prompt]],
+            'format' => $this->schema($champs),
+            'options' => [
+                'temperature' => 0,
+                'seed' => 42,
+                'num_ctx' => max(1024, (int) env('ia.numCtx', 4096)),
+                'num_predict' => max(100, (int) env('ia.numPredict', 600)),
+            ],
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($payload === false) {
+            throw new RuntimeException('Requête Ollama impossible à sérialiser.');
+        }
+        $url = rtrim((string) env('ia.url', 'http://127.0.0.1:11434'), '/') . '/api/chat';
+        [$body, $status, $error] = function_exists('curl_init')
+            ? $this->appelAvecCurl($url, $payload)
+            : $this->appelAvecFlux($url, $payload);
+        $response = is_string($body) ? json_decode($body, true) : null;
+        $record = ['groupe' => $groupe, 'prompt' => $confidentiel ? '[confidentiel]' : $prompt, 'reponse' => $confidentiel ? '[confidentiel]' : $body, 'duree_ms' => (int) round((microtime(true) - $debut) * 1000), 'tokens_entree' => $response['prompt_eval_count'] ?? 0, 'tokens_sortie' => $response['eval_count'] ?? 0, 'erreur' => $error ?: null, 'tentatives' => $tentative];
+        $this->journaliser($record);
+        if ($body === false) {
+            throw new RuntimeException('Ollama injoignable: ' . $error, self::CODE_RESEAU);
+        }
+        if ($status !== 200 || ! is_array($response)) {
+            throw new RuntimeException('Erreur Ollama (' . $status . '): ' . mb_substr((string) ($response['error'] ?? $body), 0, 300), $status ?: self::CODE_RESEAU);
+        }
+        $content = $response['message']['content'] ?? '';
+        if (! is_string($content) || trim($content) === '') {
+            throw new RuntimeException('Ollama a renvoyé une réponse vide.');
+        }
+        $this->dernierModele = $this->modelePrincipal();
+        return [$content, (int) ($response['prompt_eval_count'] ?? 0), (int) ($response['eval_count'] ?? 0)];
+    }
+
+    /** @return array{0:string|false,1:int,2:string} */
+    private function appelAvecCurl(string $url, string $payload): array
+    {
         $ch = curl_init($url);
+        if ($ch === false) {
+            return [false, 0, 'Initialisation cURL impossible.'];
+        }
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => json_encode($json, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            CURLOPT_HTTPHEADER     => array_map(static fn ($k, $v) => $k . ': ' . $v, array_keys($headers), $headers),
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
             CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_TIMEOUT        => $delai,
-            CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
-            CURLOPT_SSL_VERIFYPEER => $verifier,
-            CURLOPT_SSL_VERIFYHOST => $verifier ? 2 : 0,
+            CURLOPT_TIMEOUT => max(5, (int) env('ia.timeout', 180)),
         ]);
-        $brut    = curl_exec($ch);
-        $erreur  = curl_error($ch);
-        $code    = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-        if ($brut === false) {
-            throw new RuntimeException('API injoignable (réseau, certificat ou délai) : ' . $erreur, self::CODE_RESEAU);
-        }
-
-        $corps = json_decode((string) $brut, true);
-        if ($code !== 200 || ! is_array($corps)) {
-            $msg = is_array($corps) ? (string) ($corps['error']['message'] ?? '') : '';
-            throw new RuntimeException(
-                'Erreur API (' . $code . ') : ' . mb_substr($msg !== '' ? $msg : (string) $brut, 0, 300),
-                $code > 0 ? $code : self::CODE_RESEAU
-            );
-        }
-
-        return $corps;
+        $body = curl_exec($ch);
+        $error = curl_error($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        return [$body, $status, $error];
     }
 
-    private function decoderJson(string $txt): array
+    /** @return array{0:string|false,1:int,2:string} */
+    private function appelAvecFlux(string $url, string $payload): array
     {
-        $txt   = trim((string) preg_replace('/^```(?:json)?|```$/m', '', $txt));
-        $debut = strpos($txt, '{');
-        $fin   = strrpos($txt, '}');
-        if ($debut !== false && $fin !== false && $fin > $debut) {
-            $txt = substr($txt, $debut, $fin - $debut + 1);
-        }
-        $json = json_decode($txt, true);
-        if (! is_array($json)) {
-            throw new RuntimeException('Réponse IA invalide : JSON non exploitable.');
-        }
-
-        return $json;
-    }
-
-    private function depuisCache(string $hash, float $t0): ?array
-    {
-        try {
-            $ligne = \Config\Database::connect()->table('extractions_ia')
-                ->select('resultat_json, tokens_entree, tokens_sortie')
-                ->like('resultat_json', $hash)
-                ->orderBy('id', 'DESC')->limit(1)->get()->getRowArray();
-
-            if ($ligne && ! empty($ligne['resultat_json'])) {
-                $json = json_decode($ligne['resultat_json'], true);
-                if (is_array($json)) {
-                    return [
-                        'json'          => $json,
-                        'brut'          => $ligne['resultat_json'],
-                        'tokens_entree' => (int) ($ligne['tokens_entree'] ?? 0),
-                        'tokens_sortie' => (int) ($ligne['tokens_sortie'] ?? 0),
-                        'duree_ms'      => (int) round((microtime(true) - $t0) * 1000),
-                    ];
-                }
+        $options = [
+            'http' => [
+                'method' => 'POST',
+                'header' => "Content-Type: application/json\r\nContent-Length: " . strlen($payload),
+                'content' => $payload,
+                'timeout' => max(5, (int) env('ia.timeout', 180)),
+                'ignore_errors' => true,
+            ],
+        ];
+        $http_response_header = [];
+        $body = @file_get_contents($url, false, stream_context_create($options));
+        $status = 0;
+        foreach ($http_response_header as $header) {
+            if (preg_match('/^HTTP\/\S+\s+(\d{3})/', $header, $match) === 1) {
+                $status = (int) $match[1];
             }
-        } catch (Throwable $e) {
-            // Le cache est facultatif : en cas de problème, on appelle l'API.
         }
+        if ($body === false) {
+            $lastError = error_get_last();
+            return [false, $status, (string) ($lastError['message'] ?? 'Transport HTTP PHP indisponible.')];
+        }
+        return [$body, $status, ''];
+    }
 
+    private function schema(array $champs): array
+    {
+        $properties = [];
+        foreach ($champs as $champ) {
+            $valueSchema = ['type' => ['string', 'number', 'integer', 'boolean', 'array', 'null']];
+            if ($champ === 'devise') {
+                $valueSchema = ['type' => ['string', 'null'], 'pattern' => '^[A-Z]{3}$'];
+            }
+            if ($champ === 'reconduction_tacite') {
+                $valueSchema = ['type' => ['boolean', 'null']];
+            }
+            if ($champ === 'clauses') {
+                $valueSchema = [
+                    'type' => ['array', 'null'],
+                    'items' => [
+                        'type' => 'object',
+                        'additionalProperties' => false,
+                        'properties' => [
+                            'type_clause' => ['type' => 'string', 'enum' => ['reconduction', 'preavis', 'resiliation', 'penalite', 'paiement', 'confidentialite', 'propriete_intellectuelle', 'responsabilite', 'force_majeure', 'juridiction', 'autre']],
+                            'texte' => ['type' => 'string'],
+                            'page' => ['type' => ['integer', 'null']],
+                        ],
+                        'required' => ['type_clause', 'texte', 'page'],
+                    ],
+                ];
+            }
+            $properties[$champ] = [
+                'type' => 'object',
+                'additionalProperties' => false,
+                'properties' => ['valeur' => $valueSchema, 'extrait' => ['type' => ['string', 'null']]],
+                'required' => ['valeur', 'extrait'],
+            ];
+        }
+        return ['type' => 'object', 'additionalProperties' => false, 'properties' => $properties, 'required' => $champs];
+    }
+
+    private function promptSysteme(): string
+    {
+        return trim((string) file_get_contents(APPPATH . 'Prompts/contrat_systeme.txt'));
+    }
+
+    private function decoderJson(string $texte): array
+    {
+        $decoded = json_decode(trim($texte), true);
+        if (! is_array($decoded)) {
+            throw new RuntimeException('Réponse Ollama invalide: JSON attendu.');
+        }
+        return $decoded;
+    }
+
+    private function pageExtrait(?string $extrait, array $chunks): ?int
+    {
+        if (! is_string($extrait) || $extrait === '') {
+            return null;
+        }
+        foreach ($chunks as $chunk) {
+            if (str_contains(mb_strtolower($chunk->texte), mb_strtolower($extrait))) {
+                return $chunk->page;
+            }
+        }
         return null;
     }
 
-    private function resultat(array $json, int $in, int $out, float $t0): array
+    private function articleExtrait(?string $extrait, array $chunks): ?string
     {
-        return [
-            'json'          => $json,
-            'brut'          => json_encode($json, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            'tokens_entree' => $in,
-            'tokens_sortie' => $out,
-            'duree_ms'      => (int) round((microtime(true) - $t0) * 1000),
-        ];
+        if (! is_string($extrait) || $extrait === '') {
+            return null;
+        }
+        foreach ($chunks as $chunk) {
+            if (str_contains(mb_strtolower($chunk->texte), mb_strtolower($extrait))) {
+                return $chunk->article;
+            }
+        }
+        return null;
     }
 
-    private function systeme(): string
+    private function formatCompatible(array $champs, array $chunks, array $erreurs): array
     {
-        return <<<TXT
-Tu es un assistant juridique. Tu extrais les informations d'un contrat fournisseur.
-Réponds UNIQUEMENT par un objet JSON valide, sans texte autour ni balises. Si une information est absente, mets null.
-Dates au format AAAA-MM-JJ. Montants en nombre. reconduction_tacite vaut true ou false.
-Format attendu :
-{
- "parties": {"fournisseur": "...", "service": "..."},
- "type": "...", "intitule": "...", "objet": "...",
- "montant": 0, "devise": "MGA", "duree_mois": 0,
- "date_signature": null, "date_debut": null, "date_fin": null,
- "preavis_jours": 0, "reconduction_tacite": false, "penalites": "...",
- "clauses": [{"type_clause": "reconduction|preavis|resiliation|penalite|paiement|confidentialite|propriete_intellectuelle|responsabilite|force_majeure|juridiction|autre", "texte": "...", "page": 1, "confiance": 0.0}],
- "confiance": {"intitule": 0.0, "montant": 0.0, "date_debut": 0.0, "date_fin": 0.0, "preavis_jours": 0.0, "reconduction_tacite": 0.0}
-}
-La confiance est un nombre entre 0 et 1.
-TXT;
+        $json = ['parties' => ['fournisseur' => null, 'service' => null], 'clauses' => [], 'confiance' => []];
+        foreach (array_unique(array_merge(...array_values(self::GROUPES))) as $champ) {
+            $json['_champs'][$champ] = [
+                'valeur' => null, 'extrait' => null, 'page' => null, 'source' => 'llm',
+                'statut' => 'a_verifier', 'candidats' => [],
+            ];
+        }
+        foreach ($champs as $nom => $champ) {
+            $json[$nom] = $champ['valeur'] ?? null;
+            $json['confiance'][$nom] = ($champ['statut'] ?? '') === 'ok' ? 1.0 : 0.0;
+            $champ['page'] = $champ['page'] ?? $this->pageExtrait($champ['extrait'] ?? null, $chunks);
+            $champ['article'] = $champ['article'] ?? $this->articleExtrait($champ['extrait'] ?? null, $chunks);
+            $json['_champs'][$nom] = $champ;
+        }
+        if (isset($champs['fournisseur'])) {
+            $json['parties']['fournisseur'] = $champs['fournisseur']['valeur'];
+        }
+        if (isset($champs['service'])) {
+            $json['parties']['service'] = $champs['service']['valeur'];
+        }
+        if ($erreurs !== []) {
+            $json['_erreurs'] = $erreurs;
+        }
+        return $json;
+    }
+
+    private function journaliser(array $record): void
+    {
+        $chemin = (string) env('ia.logPath', WRITEPATH . 'logs/ollama_extraction.jsonl');
+        $dossier = dirname($chemin);
+        if (! is_dir($dossier)) {
+            @mkdir($dossier, 0775, true);
+        }
+        file_put_contents($chemin, json_encode($record, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND | LOCK_EX);
+    }
+
+    private function depuisCache(string $hash, float $debut): ?array
+    {
+        try {
+            $ligne = \Config\Database::connect()->table('extractions_ia')->select('reponse_json,tokens_entree,tokens_sortie')->like('reponse_json', $hash)->orderBy('id', 'DESC')->limit(1)->get()->getRowArray();
+            if ($ligne && ! empty($ligne['reponse_json']) && is_array($json = json_decode((string) $ligne['reponse_json'], true))
+                && ($json['_pipeline'] ?? null) === self::VERSION_PROMPT
+            ) {
+                return $this->resultat($json, (int) ($ligne['tokens_entree'] ?? 0), (int) ($ligne['tokens_sortie'] ?? 0), $debut);
+            }
+        } catch (Throwable $exception) {
+            log_message('warning', '[IA] cache indisponible: ' . $exception->getMessage());
+        }
+        return null;
+    }
+
+    private function resultat(array $json, int $entree, int $sortie, float $debut): array
+    {
+        return ['json' => $json, 'brut' => (string) json_encode($json, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 'tokens_entree' => $entree, 'tokens_sortie' => $sortie, 'duree_ms' => (int) round((microtime(true) - $debut) * 1000)];
     }
 
     private function jsonSimule(): array
     {
-        $debut = date('Y-m-d', strtotime('-6 months'));
-        $fin   = date('Y-m-d', strtotime('+18 months'));
-
-        return [
-            'parties'  => ['fournisseur' => 'Fournisseur de démonstration', 'service' => 'Achats'],
-            'type'     => 'Maintenance',
-            'intitule' => 'Contrat de maintenance (simulation)',
-            'objet'    => 'Maintenance préventive et corrective des équipements.',
-            'montant'  => 12000000, 'devise' => 'MGA', 'duree_mois' => 24,
-            'date_signature' => $debut, 'date_debut' => $debut, 'date_fin' => $fin,
-            'preavis_jours' => 60, 'reconduction_tacite' => true,
-            'penalites' => 'Pénalité de 1 % par semaine de retard, plafonnée à 10 %.',
-            'clauses' => [
-                ['type_clause' => 'reconduction', 'texte' => 'Le contrat est reconduit tacitement pour des périodes de 12 mois.', 'page' => 3, 'confiance' => 0.93],
-                ['type_clause' => 'preavis',      'texte' => 'Préavis de 60 jours avant le terme par lettre recommandée.',       'page' => 3, 'confiance' => 0.88],
-                ['type_clause' => 'penalite',     'texte' => 'Pénalité de 1 % par semaine de retard, plafonnée à 10 %.',          'page' => 5, 'confiance' => 0.74],
-                ['type_clause' => 'juridiction',  'texte' => 'Tribunal de commerce d\'Antananarivo.',                             'page' => 8, 'confiance' => 0.61],
-            ],
-            'confiance' => ['intitule' => 0.9, 'montant' => 0.85, 'date_debut' => 0.9, 'date_fin' => 0.9, 'preavis_jours' => 0.88, 'reconduction_tacite' => 0.93],
-        ];
+        return ['parties' => ['fournisseur' => 'Fournisseur de démonstration', 'service' => 'Achats'], 'type' => 'Maintenance', 'intitule' => 'Contrat de maintenance (simulation)', 'objet' => 'Maintenance préventive et corrective.', 'montant' => 12000000, 'devise' => 'MGA', 'duree_mois' => 24, 'date_signature' => date('Y-m-d', strtotime('-6 months')), 'date_debut' => date('Y-m-d', strtotime('-6 months')), 'date_fin' => date('Y-m-d', strtotime('+18 months')), 'preavis_jours' => 60, 'reconduction_tacite' => true, 'penalites' => null, 'clauses' => [], 'confiance' => []];
     }
 }

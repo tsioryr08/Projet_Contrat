@@ -73,7 +73,17 @@ class AlerteService
 
             $c['jours_restants'] = $j;
             $confidentiel = ((int) ($c['confidentiel'] ?? 0)) === 1;
-            $redige = $this->redacteur->rediger($c, (string) $r['code'], $confidentiel);
+            $dateLimiteFr = $this->dateFr($c['date_limite_non_reconduction']);
+            $redige = $this->redacteur->rediger(
+                $c,
+                (string) $r['code'],
+                (string) $c['reference'],
+                (string) ($c['fournisseur_nom'] ?? ''),
+                $dateLimiteFr,
+                $j,
+                $confidentiel,
+                $this->sansIa
+            );
             $sujet = $redige['sujet'];
             $msg   = $redige['message'];
             $genereParIa = (int) $redige['genere_par_ia'];

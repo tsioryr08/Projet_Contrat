@@ -1,0 +1,124 @@
+INSTALLATION DE L'IA LOCALE OLLAMA
+==================================
+
+Configuration utilisée par l'application :
+- Fournisseur : Ollama
+- Modèle : qwen2.5:3b
+- Adresse locale : http://127.0.0.1:11434
+
+Ces commandes sont prévues pour Linux (Ubuntu/Debian).
+
+
+1. Installer Ollama
+-------------------
+
+curl -fsSL https://ollama.com/install.sh | sh
+
+
+2. Démarrer Ollama au démarrage du système
+-------------------------------------------
+
+sudo systemctl enable --now ollama
+
+Vérifier que le service fonctionne :
+
+systemctl status ollama --no-pager
+
+
+3. Télécharger le modèle utilisé par l'application
+---------------------------------------------------
+
+ollama pull qwen2.5:3b
+
+Vérifier que le modèle est installé :
+
+ollama list
+
+
+4. Tester l'API locale d'Ollama
+--------------------------------
+
+curl http://127.0.0.1:11434/api/tags
+
+Tester une réponse du modèle :
+
+curl http://127.0.0.1:11434/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{"model":"qwen2.5:3b","prompt":"Réponds uniquement par : Ollama fonctionne.","stream":false}'
+
+
+5. Démarrage manuel si systemd n'est pas disponible
+----------------------------------------------------
+
+ollama serve
+
+Laisser ce terminal ouvert, puis lancer les commandes de l'application
+dans un autre terminal.
+
+
+6. Vérifier la configuration du projet
+---------------------------------------
+
+Dans le fichier .env du projet, les paramètres doivent être :
+
+ia.provider = 'ollama'
+ia.fournisseur = 'ollama'
+ia.url = 'http://127.0.0.1:11434'
+ia.model = 'qwen2.5:3b'
+ia.modeles = 'qwen2.5:3b'
+ia.mode = 'reel'
+
+
+7. Lancer l'application
+-----------------------
+
+cd /opt/lampp/htdocs/DLA/Projet_Contrat
+php spark serve --port 8080
+
+L'application est ensuite disponible à :
+
+http://localhost:8080
+
+
+8. Commandes utiles
+-------------------
+
+# Voir les modèles installés
+ollama list
+
+# Télécharger à nouveau le modèle si nécessaire
+ollama pull qwen2.5:3b
+
+# Supprimer le modèle
+ollama rm qwen2.5:3b
+
+# Voir les processus Ollama et les modèles chargés
+ollama ps
+
+# Voir les journaux du service
+sudo journalctl -u ollama -f
+
+# Vérifier que le port local répond
+curl -I http://127.0.0.1:11434
+
+
+9. Dépannage rapide
+--------------------
+
+Si curl indique que le port 11434 est inaccessible :
+
+sudo systemctl restart ollama
+systemctl status ollama --no-pager
+
+Si le modèle est absent :
+
+ollama pull qwen2.5:3b
+
+Si l'application n'arrive toujours pas à contacter Ollama :
+
+curl http://127.0.0.1:11434/api/tags
+
+Le résultat doit contenir le modèle qwen2.5:3b.
+
+L'application n'utilise pas une clé API : Ollama fonctionne localement
+sur la machine et ne transmet pas les contrats à un service distant.

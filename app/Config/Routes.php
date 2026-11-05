@@ -88,6 +88,7 @@ $routes->group('ia', ['filter' => 'role:admin,juriste,responsable'], function ($
     $routes->post('televerser', 'Ia::televerser');
     $routes->post('relancer', 'Ia::relancerPost');
     $routes->post('relancer/(:num)', 'Ia::relancer/$1');
+    $routes->get('progression/(:num)', 'Ia::progression/$1');
     $routes->get('valider/(:num)', 'Ia::valider/$1');
     $routes->post('creer-contrat/(:num)', 'Ia::creerContrat/$1');
     $routes->post('rejeter/(:num)', 'Ia::rejeter/$1');

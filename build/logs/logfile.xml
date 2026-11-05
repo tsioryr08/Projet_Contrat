@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="/opt/lampp/htdocs/DLA/Projet_Contrat/phpunit.xml.dist" tests="27" assertions="43" errors="0" failures="0" skipped="0" time="0.053050">
+    <testsuite name="App" tests="27" assertions="43" errors="0" failures="0" skipped="0" time="0.053050">
+      <testsuite name="ExampleDatabaseTest" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/database/ExampleDatabaseTest.php" tests="2" assertions="3" errors="0" failures="0" skipped="0" time="0.029716">
+        <testcase name="testModelFindAll" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/database/ExampleDatabaseTest.php" line="17" class="ExampleDatabaseTest" classname="ExampleDatabaseTest" assertions="1" time="0.023834"/>
+        <testcase name="testSoftDeleteLeavesRow" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/database/ExampleDatabaseTest.php" line="28" class="ExampleDatabaseTest" classname="ExampleDatabaseTest" assertions="2" time="0.005883"/>
+      </testsuite>
+      <testsuite name="ExampleSessionTest" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/session/ExampleSessionTest.php" tests="1" assertions="1" errors="0" failures="0" skipped="0" time="0.001149">
+        <testcase name="testSessionSimple" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/session/ExampleSessionTest.php" line="10" class="ExampleSessionTest" classname="ExampleSessionTest" assertions="1" time="0.001149"/>
+      </testsuite>
+      <testsuite name="ContractExtractionTest" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" tests="22" assertions="36" errors="0" failures="0" skipped="0" time="0.015677">
+        <testsuite name="ContractExtractionTest::testRegexExtractsValidValues" tests="10" assertions="20" errors="0" failures="0" skipped="0" time="0.007842">
+          <testcase name="testRegexExtractsValidValues with data set #0" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="15" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="2" time="0.001694"/>
+          <testcase name="testRegexExtractsValidValues with data set #1" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="15" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="2" time="0.000664"/>
+          <testcase name="testRegexExtractsValidValues with data set #2" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="15" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="2" time="0.000829"/>
+          <testcase name="testRegexExtractsValidValues with data set #3" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="15" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="2" time="0.000806"/>
+          <testcase name="testRegexExtractsValidValues with data set #4" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="15" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="2" time="0.000642"/>
+          <testcase name="testRegexExtractsValidValues with data set #5" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="15" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="2" time="0.000570"/>
+          <testcase name="testRegexExtractsValidValues with data set #6" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="15" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="2" time="0.000701"/>
+          <testcase name="testRegexExtractsValidValues with data set #7" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="15" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="2" time="0.000637"/>
+          <testcase name="testRegexExtractsValidValues with data set #8" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="15" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="2" time="0.000672"/>
+          <testcase name="testRegexExtractsValidValues with data set #9" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="15" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="2" time="0.000628"/>
+        </testsuite>
+        <testsuite name="ContractExtractionTest::testRegexRejectsInvalidIdentifiers" tests="10" assertions="10" errors="0" failures="0" skipped="0" time="0.006453">
+          <testcase name="testRegexRejectsInvalidIdentifiers with data set #0" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="39" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="1" time="0.001070"/>
+          <testcase name="testRegexRejectsInvalidIdentifiers with data set #1" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="39" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="1" time="0.000717"/>
+          <testcase name="testRegexRejectsInvalidIdentifiers with data set #2" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="39" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="1" time="0.000805"/>
+          <testcase name="testRegexRejectsInvalidIdentifiers with data set #3" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="39" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="1" time="0.000676"/>
+          <testcase name="testRegexRejectsInvalidIdentifiers with data set #4" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="39" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="1" time="0.000562"/>
+          <testcase name="testRegexRejectsInvalidIdentifiers with data set #5" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="39" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="1" time="0.000507"/>
+          <testcase name="testRegexRejectsInvalidIdentifiers with data set #6" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="39" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="1" time="0.000493"/>
+          <testcase name="testRegexRejectsInvalidIdentifiers with data set #7" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="39" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="1" time="0.000567"/>
+          <testcase name="testRegexRejectsInvalidIdentifiers with data set #8" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="39" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="1" time="0.000511"/>
+          <testcase name="testRegexRejectsInvalidIdentifiers with data set #9" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="39" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="1" time="0.000545"/>
+        </testsuite>
+        <testcase name="testCitationAndTypeAreRequiredForOk" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="58" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="3" time="0.000799"/>
+        <testcase name="testRegexWinsAndConflictsAreKept" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/ContractExtractionTest.php" line="77" class="ContractExtractionTest" classname="ContractExtractionTest" assertions="3" time="0.000582"/>
+      </testsuite>
+      <testsuite name="HealthTest" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/HealthTest.php" tests="2" assertions="3" errors="0" failures="0" skipped="0" time="0.006508">
+        <testcase name="testIsDefinedAppPath" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/HealthTest.php" line="12" class="HealthTest" classname="HealthTest" assertions="1" time="0.000595"/>
+        <testcase name="testBaseUrlHasBeenSet" file="/opt/lampp/htdocs/DLA/Projet_Contrat/tests/unit/HealthTest.php" line="17" class="HealthTest" classname="HealthTest" assertions="2" time="0.005913"/>
+      </testsuite>
+    </testsuite>
+  </testsuite>
+</testsuites>

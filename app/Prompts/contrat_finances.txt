@@ -1,0 +1,6 @@
+Tâche : extraire les informations financières.
+Champs : montant (nombre), devise (code), penalites (texte exact), modalites_paiement (texte exact).
+Exemple : {"montant":{"valeur":12500,"extrait":"12 500 €"},"devise":{"valeur":"EUR","extrait":"euros"},"penalites":{"valeur":null,"extrait":null},"modalites_paiement":{"valeur":null,"extrait":null}}
+Texte fourni :
+{{texte}}
+Sortie JSON :
